@@ -1,0 +1,7 @@
+{
+    "sweetpad.build.xcodeWorkspacePath": "Revise.xcodeproj/project.xcworkspace",
+    "[swift]": {
+        "editor.defaultFormatter": "sweetpad.sweetpad",
+        "editor.formatOnSave": true,
+    }
+}
