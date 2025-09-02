@@ -9,7 +9,6 @@ struct Version: Identifiable, Equatable, Codable {
   let metadata: ChangeMetadata
 
   enum ChangeType: Equatable, Codable {
-    case initial
     case manual
     case synonym(word: String, replacement: String)
     case ai(prompt: String)

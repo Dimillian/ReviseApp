@@ -20,12 +20,7 @@ struct Thesaurus {
   private let session: LanguageModelSession
 
   init() {
-    // Session-level “system prompt” keeps the model focused across calls.
-    self.session = LanguageModelSession(
-      instructions: """
-        You generate synonyms. Output MUST be only structured data as requested.
-        If the word is ambiguous, infer meaning from the provided sentence.
-        """)
+    self.session = LanguageModelSession()
     session.prewarm()
   }
 
@@ -48,5 +43,30 @@ struct Thesaurus {
     )
 
     return response.content.words
+  }
+
+  func title(for text: String) async throws -> String {
+    let prompt: String = """
+      Input text: \(text)
+      Return a simple title that fit for the text.
+      Don't wrap it in any JSON, simply return the title as a string, without any quotation marks.
+      """
+
+    let response = try await session.respond(to: prompt)
+
+    return response.content
+  }
+
+  func initialTitle() async throws -> String {
+    let prompt: String = """
+      Return a simple to world title for a new document. 
+      Like "Sigma Alpha". 
+      Two random words.
+      Don't wrap it in any JSON, simply return the title as a string, without any quotation marks.
+      """
+
+    let response = try await session.respond(to: prompt)
+
+    return response.content
   }
 }

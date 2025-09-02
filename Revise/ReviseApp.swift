@@ -9,9 +9,11 @@ import SwiftUI
 
 @main
 struct ReviseApp: App {
+  @State private var document = Document(id: UUID().uuidString)
+  
   var body: some Scene {
     WindowGroup {
-      EditorView()
+      EditorView(document: document)
     }
   }
 }

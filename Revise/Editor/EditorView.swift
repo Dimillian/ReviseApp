@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct EditorView: View {
+  private let document: Document
+
   @State private var text = ""
 
   @State private var editorController: EditorController
@@ -11,10 +13,12 @@ struct EditorView: View {
   private let timelineWidth: CGFloat = 44
   private let textPadding: CGFloat = 24
 
-  init() {
-    let versionStore = VersionStore()
-    self.versionStore = versionStore
-    self.editorController = EditorController(versionStore: versionStore)
+  init(document: Document) {
+    self.document = document
+    let versionStore = VersionStore(document: document)
+    let editorController = EditorController(versionStore: versionStore)
+    _versionStore = State(initialValue: versionStore)
+    _editorController = State(initialValue: editorController)
   }
 
   var body: some View {
@@ -57,6 +61,17 @@ struct EditorView: View {
         ToolbarItem(placement: .title) {
           titleView
         }
+        ToolbarItem(placement: .subtitle) {
+          subtitleView
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+          ShareLink(document.title, item: text)
+        }
+      }
+      .onAppear {
+        if text.isEmpty {
+          editorController.generateInitialTitle()
+        }
       }
       .scrollEdgeEffectStyle(.soft, for: .top)
       .onChange(of: text) {
@@ -75,6 +90,17 @@ struct EditorView: View {
   }
 
   private var titleView: some View {
+    Text(document.title)
+      .font(.inter(size: 18, relativeTo: .body))
+      .foregroundStyle(.textPrimary)
+      .contentTransition(.interpolate)
+      .animation(.bouncy, value: document.title)
+      .onTapGesture {
+        isTimelineVisible.toggle()
+      }
+  }
+
+  private var subtitleView: some View {
     HStack(spacing: 0) {
       Text("\(editorController.wordsCount)")
         .contentTransition(.numericText(value: Double(editorController.wordsCount)))

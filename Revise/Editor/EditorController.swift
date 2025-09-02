@@ -1,6 +1,7 @@
 import UIKit
 
 @Observable
+@MainActor
 final class EditorController: NSObject {
   public var wordsCount: Int = 0
 
@@ -17,14 +18,6 @@ final class EditorController: NSObject {
         wordsCount =
           textView.text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
           .count
-
-        // Create initial version if text exists
-        if !textView.text.isEmpty {
-          versionStore.createVersion(
-            text: textView.text,
-            changeType: .initial
-          )
-        }
       }
     }
   }
@@ -40,6 +33,17 @@ final class EditorController: NSObject {
 
   init(versionStore: VersionStore) {
     self.versionStore = versionStore
+
+    super.init()
+  }
+
+  func generateInitialTitle() {
+    if versionStore.document.title.isEmpty {
+      Task {
+        let title = try? await thesaurus.initialTitle()
+        versionStore.document.title = title ?? ""
+      }
+    }
   }
 
   func handleWordSelection(at range: UITextRange) {
@@ -108,6 +112,8 @@ extension EditorController: UITextViewDelegate {
       let wordsCount = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
         .count
 
+      let title = try? await self?.thesaurus.title(for: text)
+
       // Create the version
       await MainActor.run { [weak self] in
         guard let self else { return }
@@ -115,7 +121,8 @@ extension EditorController: UITextViewDelegate {
         self.versionStore.createVersion(
           text: text,
           changeType: .manual,
-          cursorPosition: cursorPosition
+          cursorPosition: cursorPosition,
+          updatedTitle: title
         )
       }
     }

@@ -90,8 +90,6 @@ struct VersionNode: View {
       return Color.aiPurple
     case .ai:
       return Color.aiPurple
-    case .initial:
-      return Color.gray
     default:
       return Color.gray
     }
