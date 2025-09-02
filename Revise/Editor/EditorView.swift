@@ -14,7 +14,7 @@ struct EditorView: View {
 
   var body: some View {
     NavigationStack {
-      HStack(spacing: 24) {
+      ZStack(alignment: .leading) {
         VersionTimelineView(
           versionStore: versionStore,
           onVersionSelected: { version in
@@ -22,18 +22,37 @@ struct EditorView: View {
           }
         )
         .frame(width: 44)
-        MagneticTextEditor(text: $text, editorController: editorController)
-          .padding(.trailing, 24)
+
+        ScrollView(.vertical) {
+          MagneticTextEditor(text: $text, editorController: editorController)
+            .padding(.trailing, 24)
+            .padding(.leading, 62)
+        }
+        .scrollContentBackground(.hidden)
       }
       .background(Color.background)
       .toolbar {
         ToolbarItem(placement: .title) {
-          Text("\(editorController.wordsCount) words | \(versionStore.versions.count) versions")
-            .font(.inter(size: 12, relativeTo: .caption))
-            .foregroundStyle(.textSecondary)
+          titleView
         }
       }
-      .scrollEdgeEffectStyle(.hard, for: .top)
+      .scrollEdgeEffectStyle(.soft, for: .top)
     }
+  }
+
+  private var titleView: some View {
+    HStack(spacing: 0) {
+      Text("\(editorController.wordsCount)")
+        .contentTransition(.numericText(value: Double(editorController.wordsCount)))
+        .animation(.bouncy, value: editorController.wordsCount)
+      Text(editorController.wordsCount == 1 ? " word" : " words")
+      Text("  •  ")
+      Text("\(versionStore.versions.count)")
+        .contentTransition(.numericText(value: Double(versionStore.versions.count)))
+        .animation(.bouncy, value: versionStore.versions.count)
+      Text(versionStore.versions.count == 1 ? " version" : " versions")
+    }
+    .font(.inter(size: 12, relativeTo: .caption))
+    .foregroundStyle(.textSecondary)
   }
 }

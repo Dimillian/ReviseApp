@@ -4,6 +4,23 @@ import UIKit
 // Custom UITextView that can suppress the default menu
 class MagneticTextView: UITextView {
   var shouldSuppressMenu = false
+  
+  override var intrinsicContentSize: CGSize {
+    guard !text.isEmpty else {
+      // Return a minimum height for empty text
+      return CGSize(width: UIView.noIntrinsicMetric, height: 100)
+    }
+    
+    // Calculate the size that fits the content
+    let size = sizeThatFits(CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude))
+    return CGSize(width: UIView.noIntrinsicMetric, height: size.height)
+  }
+  
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    // Invalidate intrinsic content size when layout changes
+    invalidateIntrinsicContentSize()
+  }
 
   override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
     if shouldSuppressMenu {
@@ -19,6 +36,14 @@ class MagneticTextView: UITextView {
   }
 }
 
+// SwiftUI height preference key for dynamic sizing
+struct TextViewHeightPreferenceKey: PreferenceKey {
+  static var defaultValue: CGFloat = 100
+  static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+    value = nextValue()
+  }
+}
+
 struct MagneticTextEditor: UIViewRepresentable {
   @Binding var text: String
   let editorController: EditorController
@@ -30,11 +55,15 @@ struct MagneticTextEditor: UIViewRepresentable {
   func makeUIView(context: Context) -> UITextView {
     let tv = MagneticTextView()
     tv.backgroundColor = .clear
-    tv.isScrollEnabled = true
-    tv.alwaysBounceVertical = true
+    tv.isScrollEnabled = false  // Never scroll internally
+    tv.alwaysBounceVertical = false
     tv.keyboardDismissMode = .interactive
     tv.showsVerticalScrollIndicator = false
     tv.delegate = context.coordinator
+    
+    // Set content compression resistance for proper sizing
+    tv.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    tv.setContentCompressionResistancePriority(.required, for: .vertical)
 
     // Typography (match design system defaults)
     if let literata = UIFont(name: "Literata", size: 26) {
@@ -60,6 +89,8 @@ struct MagneticTextEditor: UIViewRepresentable {
   func updateUIView(_ uiView: UITextView, context: Context) {
     if uiView.text != text {
       uiView.text = text
+      // Always invalidate size when text changes
+      uiView.invalidateIntrinsicContentSize()
     }
   }
 
@@ -89,6 +120,8 @@ struct MagneticTextEditor: UIViewRepresentable {
     func textViewDidChange(_ textView: UITextView) {
       parent.text = textView.text
       editorController.textViewDidChange(textView)
+      // Always invalidate size when text changes
+      textView.invalidateIntrinsicContentSize()
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {

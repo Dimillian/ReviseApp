@@ -89,29 +89,27 @@ final class EditorController: NSObject {
 // MARK: - UITextViewDelegate
 extension EditorController: UITextViewDelegate {
   func textViewDidChange(_ textView: UITextView) {
-    wordsCount =
-      textView.text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.count
-
-    // Don't track versions when restoring or applying synonyms
     guard !isRestoringVersion && !isApplyingSynonym else { return }
 
-    // Cancel any existing debounce task
     versionDebounceTask?.cancel()
-    
-    // Create a new debounced task to create version after user stops typing
+
     let text = textView.text ?? ""
     let cursorPosition = textView.selectedRange.location
-    
+
     versionDebounceTask = Task { [weak self] in
       // Wait for 0.5 seconds
-      try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-      
+      try? await Task.sleep(nanoseconds: 500_000_000)  // 0.5 seconds
+
       // Check if task was cancelled during sleep
       guard !Task.isCancelled else { return }
-      
+
+      let wordsCount = text.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+        .count
+
       // Create the version
       await MainActor.run { [weak self] in
         guard let self else { return }
+        self.wordsCount = wordsCount
         self.versionStore.createVersion(
           text: text,
           changeType: .manual,
@@ -214,7 +212,7 @@ extension EditorController: UIEditMenuInteractionDelegate {
 
           // Cancel any pending version task
           self.versionDebounceTask?.cancel()
-          
+
           // Set flag to prevent duplicate version from textViewDidChange
           self.isApplyingSynonym = true
 
@@ -231,7 +229,7 @@ extension EditorController: UIEditMenuInteractionDelegate {
             changeType: .synonym(word: originalWord, replacement: synonym),
             cursorPosition: cursorPosition
           )
-          
+
           // Reset flag after a small delay to ensure textViewDidChange has been called
           DispatchQueue.main.async {
             self.isApplyingSynonym = false
