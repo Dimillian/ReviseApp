@@ -89,6 +89,8 @@ final class EditorController: NSObject {
 // MARK: - UITextViewDelegate
 extension EditorController: UITextViewDelegate {
   func textViewDidChange(_ textView: UITextView) {
+    editMenuInteraction?.dismissMenu()
+
     guard !isRestoringVersion && !isApplyingSynonym else { return }
 
     versionDebounceTask?.cancel()

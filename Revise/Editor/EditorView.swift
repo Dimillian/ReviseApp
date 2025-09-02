@@ -1,11 +1,12 @@
 import SwiftUI
 
 struct EditorView: View {
-  @State private var text = "Hello World"
+  @State private var text = ""
 
   @State private var editorController: EditorController
   @State private var versionStore: VersionStore
   @State private var isTimelineVisible = true
+  @State private var isFirstLaunch = true
 
   private let timelineWidth: CGFloat = 44
   private let textPadding: CGFloat = 24
@@ -20,12 +21,15 @@ struct EditorView: View {
     NavigationStack {
       ZStack(alignment: .leading) {
         ScrollView(.vertical) {
-          MagneticTextEditor(text: $text, editorController: editorController)
-            .padding(.trailing, textPadding)
-            .padding(.leading, (isTimelineVisible ? timelineWidth : 0) + textPadding)
-            .animation(.bouncy, value: isTimelineVisible)
+          ZStack(alignment: .topLeading) {
+            if text.isEmpty {
+              welcomeView
+            }
+            textEditor
+          }
         }
         .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.interactively)
 
         VersionTimelineView(
           versionStore: versionStore,
@@ -55,7 +59,19 @@ struct EditorView: View {
         }
       }
       .scrollEdgeEffectStyle(.soft, for: .top)
+      .onChange(of: text) {
+        if !text.isEmpty {
+          isFirstLaunch = false
+        }
+      }
     }
+  }
+
+  private var textEditor: some View {
+    MagneticTextEditor(text: $text, editorController: editorController)
+      .padding(.trailing, textPadding)
+      .padding(.leading, (isTimelineVisible ? timelineWidth : 0) + textPadding)
+      .animation(.bouncy, value: isTimelineVisible)
   }
 
   private var titleView: some View {
@@ -72,5 +88,21 @@ struct EditorView: View {
     }
     .font(.inter(size: 12, relativeTo: .caption))
     .foregroundStyle(.textSecondary)
+    .onTapGesture {
+      isTimelineVisible.toggle()
+    }
+  }
+
+  @ViewBuilder
+  private var welcomeView: some View {
+    if text.isEmpty && isFirstLaunch {
+      Text(
+        "  Welcome to Redraft\n\nEvery edit creates a new version you can instantly revisit.\n\nType anything to get started."
+      )
+      .font(.literata(size: 26, relativeTo: .body))
+      .foregroundStyle(.textSecondary)
+      .padding(.leading, (isTimelineVisible ? timelineWidth : 0) + textPadding)
+      .padding(.trailing, textPadding)
+    }
   }
 }
