@@ -33,25 +33,12 @@ struct Thesaurus {
   func synonyms(
     for word: String,
     sentenceContext: String? = nil,
-    languageHint: String? = nil,  // "en", "fr", etc.
-    partOfSpeech: String? = nil  // "noun", "verb", "adjective", ...
   ) async throws -> [String] {
-
-    // Lightweight language guess from context if caller doesn't pass one.
-    let lang =
-      languageHint
-      ?? {
-        let recognizer = NLLanguageRecognizer()
-        recognizer.processString(sentenceContext ?? word)
-        return recognizer.dominantLanguage?.rawValue
-      }()
 
     // Build a precise user prompt (short and bounded).
     let prompt: String = """
       Input word: \(word)
-      Language (BCP-47 code if known): \(lang ?? "unknown")
-      Part of speech (if known): \(partOfSpeech ?? "unknown")
-      Context sentence (optional): \(sentenceContext ?? "none")
+      Context sentence: \(sentenceContext ?? "none")
       Return only synonyms as specified by the schema.
       """
 

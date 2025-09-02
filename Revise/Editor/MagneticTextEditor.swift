@@ -30,7 +30,6 @@ struct MagneticTextEditor: UIViewRepresentable {
   func makeUIView(context: Context) -> UITextView {
     let tv = MagneticTextView()
     tv.backgroundColor = .clear
-    tv.textContainerInset = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
     tv.isScrollEnabled = true
     tv.alwaysBounceVertical = true
     tv.keyboardDismissMode = .interactive
