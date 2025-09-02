@@ -4,18 +4,18 @@ import UIKit
 // Custom UITextView that can suppress the default menu
 class MagneticTextView: UITextView {
   var shouldSuppressMenu = false
-  
+
   override var intrinsicContentSize: CGSize {
     guard !text.isEmpty else {
       // Return a minimum height for empty text
       return CGSize(width: UIView.noIntrinsicMetric, height: 100)
     }
-    
+
     // Calculate the size that fits the content
     let size = sizeThatFits(CGSize(width: bounds.width, height: CGFloat.greatestFiniteMagnitude))
     return CGSize(width: UIView.noIntrinsicMetric, height: size.height)
   }
-  
+
   override func layoutSubviews() {
     super.layoutSubviews()
     // Invalidate intrinsic content size when layout changes
@@ -60,17 +60,16 @@ struct MagneticTextEditor: UIViewRepresentable {
     tv.keyboardDismissMode = .interactive
     tv.showsVerticalScrollIndicator = false
     tv.delegate = context.coordinator
-    
+    tv.writingToolsBehavior = .complete
+
     // Set content compression resistance for proper sizing
     tv.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     tv.setContentCompressionResistancePriority(.required, for: .vertical)
 
-    // Typography (match design system defaults)
-    if let literata = UIFont(name: "Literata", size: 26) {
+    if let literata = UIFont(name: Font.literataName, size: 26) {
       tv.font = literata
-    } else {
-      tv.font = UIFont.preferredFont(forTextStyle: .title2)
     }
+
     tv.textColor = UIColor { trait in
       trait.userInterfaceStyle == .dark ? .white : .black
     }

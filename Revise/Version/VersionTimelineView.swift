@@ -87,13 +87,13 @@ struct VersionNode: View {
   var nodeColor: Color {
     switch version.changeType {
     case .synonym:
-      return Color.successGold
+      return Color.aiPurple
     case .ai:
       return Color.aiPurple
     case .initial:
       return Color.gray
     default:
-      return Color.treeLines
+      return Color.gray
     }
   }
 
@@ -113,43 +113,10 @@ struct VersionNode: View {
     Circle()
       .fill(nodeColor)
       .frame(width: nodeSize, height: nodeSize)
-      .overlay(
-        Circle()
-          .stroke(Color.surface, lineWidth: isActive ? 1 : 0)
-      )
+      .shadow(color: Color.successGold.opacity(0.5), radius: isActive ? 2 : 0, x: 0, y: 0)
       .scaleEffect(isActive ? 1.2 : (isHovered ? 1.1 : 1.0))
       .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isActive)
       .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isHovered)
       .position(x: 22, y: position)
-  }
-}
-
-// Helper color extension
-extension Color {
-  init(hex: String) {
-    let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-    var int: UInt64 = 0
-    Scanner(string: hex).scanHexInt64(&int)
-    let a: UInt64
-    let r: UInt64
-    let g: UInt64
-    let b: UInt64
-    switch hex.count {
-    case 3:  // RGB (12-bit)
-      (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-    case 6:  // RGB (24-bit)
-      (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-    case 8:  // ARGB (32-bit)
-      (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-    default:
-      (a, r, g, b) = (255, 0, 0, 0)
-    }
-    self.init(
-      .sRGB,
-      red: Double(r) / 255,
-      green: Double(g) / 255,
-      blue: Double(b) / 255,
-      opacity: Double(a) / 255
-    )
   }
 }

@@ -5,6 +5,10 @@ struct EditorView: View {
 
   @State private var editorController: EditorController
   @State private var versionStore: VersionStore
+  @State private var isTimelineVisible = true
+
+  private let timelineWidth: CGFloat = 44
+  private let textPadding: CGFloat = 24
 
   init() {
     let versionStore = VersionStore()
@@ -15,21 +19,35 @@ struct EditorView: View {
   var body: some View {
     NavigationStack {
       ZStack(alignment: .leading) {
+        ScrollView(.vertical) {
+          MagneticTextEditor(text: $text, editorController: editorController)
+            .padding(.trailing, textPadding)
+            .padding(.leading, (isTimelineVisible ? timelineWidth : 0) + textPadding)
+            .animation(.bouncy, value: isTimelineVisible)
+        }
+        .scrollContentBackground(.hidden)
+
         VersionTimelineView(
           versionStore: versionStore,
           onVersionSelected: { version in
             editorController.restoreVersion(version)
           }
         )
-        .frame(width: 44)
-
-        ScrollView(.vertical) {
-          MagneticTextEditor(text: $text, editorController: editorController)
-            .padding(.trailing, 24)
-            .padding(.leading, 62)
-        }
-        .scrollContentBackground(.hidden)
+        .frame(width: timelineWidth)
+        .opacity(isTimelineVisible ? 1 : 0)
+        .offset(x: isTimelineVisible ? 0 : -timelineWidth)
+        .animation(.bouncy, value: isTimelineVisible)
       }
+      .contentShape(Rectangle())
+      .gesture(
+        DragGesture(minimumDistance: 2)
+          .onEnded { value in
+            let horizontalTranslation = value.translation.width
+            let isDraggingRight = horizontalTranslation > 0
+            let newTimelineVisibility = isDraggingRight
+            isTimelineVisible = newTimelineVisibility
+          }
+      )
       .background(Color.background)
       .toolbar {
         ToolbarItem(placement: .title) {

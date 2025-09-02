@@ -1,0 +1,140 @@
+{
+  "fill" : {
+    "solid" : "extended-gray:1.00000,1.00000"
+  },
+  "groups" : [
+    {
+      "blend-mode-specializations" : [
+        {
+          "appearance" : "dark",
+          "value" : "normal"
+        }
+      ],
+      "blur-material-specializations" : [
+        {
+          "value" : 0.1
+        },
+        {
+          "appearance" : "dark",
+          "value" : 1
+        }
+      ],
+      "layers" : [
+        {
+          "fill-specializations" : [
+            {
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:1.00000,0.80000,0.00000,1.00000",
+                  "extended-srgb:1.00000,0.21961,0.23529,1.00000"
+                ]
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:1.00000,0.80000,0.00000,1.00000",
+                  "extended-srgb:1.00000,0.21961,0.23529,1.00000"
+                ]
+              }
+            }
+          ],
+          "image-name" : "Sparkle.png",
+          "name" : "Sparkle",
+          "position" : {
+            "scale" : 0.1,
+            "translation-in-points" : [
+              -200,
+              -200
+            ]
+          }
+        }
+      ],
+      "lighting-specializations" : [
+        {
+          "appearance" : "dark",
+          "value" : "individual"
+        }
+      ],
+      "shadow-specializations" : [
+        {
+          "value" : {
+            "kind" : "neutral",
+            "opacity" : 1
+          }
+        },
+        {
+          "appearance" : "dark",
+          "value" : {
+            "kind" : "layer-color",
+            "opacity" : 0.5
+          }
+        }
+      ],
+      "translucency-specializations" : [
+        {
+          "value" : {
+            "enabled" : false,
+            "value" : 1
+          }
+        },
+        {
+          "appearance" : "dark",
+          "value" : {
+            "enabled" : false,
+            "value" : 0.5
+          }
+        }
+      ]
+    },
+    {
+      "layers" : [
+        {
+          "fill-specializations" : [
+            {
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:1.00000,0.21961,0.23529,1.00000",
+                  "extended-srgb:1.00000,0.80000,0.00000,1.00000"
+                ]
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "extended-srgb:1.00000,0.21961,0.23529,1.00000",
+                  "extended-srgb:1.00000,0.80000,0.00000,1.00000"
+                ]
+              }
+            }
+          ],
+          "image-name" : "Write.png",
+          "name" : "Write",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              0,
+              70
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

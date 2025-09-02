@@ -2,8 +2,8 @@ import SwiftUI
 
 extension Font {
   // MARK: - Custom Font Names
-  private static let literataName = "Literata"
-  private static let interName = "Inter"
+  static let literataName = "Literata"
+  static let interName = "Inter"
 
   // MARK: - Literata Font
   static func literata(size: CGFloat = 17, relativeTo textStyle: TextStyle = .body) -> Font {

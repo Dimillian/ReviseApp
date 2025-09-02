@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		E912D8C12E66EDEE004F6328 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = E912D8C02E66EDEE004F6328 /* AppIcon.icon */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		E912D5D52E65E161004F6328 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		E912D5C72E65E160004F6328 /* Revise.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Revise.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E912D5D42E65E161004F6328 /* ReviseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ReviseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E912D5DE2E65E161004F6328 /* ReviseUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ReviseUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		E912D8C02E66EDEE004F6328 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = AppIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -88,6 +93,7 @@
 		E912D5BE2E65E160004F6328 = {
 			isa = PBXGroup;
 			children = (
+				E912D8C02E66EDEE004F6328 /* AppIcon.icon */,
 				E912D5C92E65E160004F6328 /* Revise */,
 				E912D5D72E65E161004F6328 /* ReviseTests */,
 				E912D5E12E65E161004F6328 /* ReviseUITests */,
@@ -225,6 +231,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E912D8C12E66EDEE004F6328 /* AppIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -414,6 +421,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Revise/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Redraft;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -447,6 +456,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Revise/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Redraft;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
