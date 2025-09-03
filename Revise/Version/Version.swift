@@ -21,26 +21,28 @@ struct Version: Identifiable, Equatable, Codable {
     let characterCount: Int
     let cursorPosition: Int?
     let selectedRange: NSRange?
+    let highlightedRange: NSRange?  // Range to highlight for AI/synonym changes
 
-    init(from text: String, cursorPosition: Int? = nil, selectedRange: NSRange? = nil) {
+    init(from text: String, cursorPosition: Int? = nil, selectedRange: NSRange? = nil, highlightedRange: NSRange? = nil) {
       self.characterCount = text.count
       self.wordCount =
         text.components(separatedBy: .whitespacesAndNewlines)
         .filter { !$0.isEmpty }.count
       self.cursorPosition = cursorPosition
       self.selectedRange = selectedRange
+      self.highlightedRange = highlightedRange
     }
   }
 
   init(
-    text: String, changeType: ChangeType, cursorPosition: Int? = nil, selectedRange: NSRange? = nil
+    text: String, changeType: ChangeType, cursorPosition: Int? = nil, selectedRange: NSRange? = nil, highlightedRange: NSRange? = nil
   ) {
     self.id = UUID().uuidString
     self.timestamp = Date()
     self.text = text
     self.changeType = changeType
     self.metadata = ChangeMetadata(
-      from: text, cursorPosition: cursorPosition, selectedRange: selectedRange)
+      from: text, cursorPosition: cursorPosition, selectedRange: selectedRange, highlightedRange: highlightedRange)
   }
 }
 

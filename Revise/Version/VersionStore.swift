@@ -110,7 +110,7 @@ final class VersionStore {
 
   func createVersion(
     text: String, changeType: Version.ChangeType, cursorPosition: Int? = nil,
-    selectedRange: NSRange? = nil, updatedTitle: String? = nil
+    selectedRange: NSRange? = nil, highlightedRange: NSRange? = nil, updatedTitle: String? = nil
   ) {
     if let updatedTitle {
       document.title = updatedTitle
@@ -119,7 +119,8 @@ final class VersionStore {
       text: text,
       changeType: changeType,
       cursorPosition: cursorPosition,
-      selectedRange: selectedRange
+      selectedRange: selectedRange,
+      highlightedRange: highlightedRange
     )
 
     document.wordsCount = version.metadata.wordCount

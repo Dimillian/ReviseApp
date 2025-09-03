@@ -124,6 +124,13 @@ struct MagneticTextEditor: UIViewRepresentable {
       textView.invalidateIntrinsicContentSize()
     }
 
+    func textView(
+      _ textView: UITextView, shouldChangeTextInRanges ranges: [NSValue],
+      replacementText text: String
+    ) -> Bool {
+      editorController.textView(textView, shouldChangeTextInRanges: ranges, replacementText: text)
+    }
+
     func textViewDidChangeSelection(_ textView: UITextView) {
       editorController.textViewDidChangeSelection(textView)
     }
