@@ -1,11 +1,37 @@
 import SwiftUI
 
+enum TimelineViewState {
+  case hidden, visible, expanded
+
+  var width: CGFloat {
+    switch self {
+    case .hidden, .visible:
+      return 44
+    case .expanded:
+      return 100
+    }
+  }
+
+  func toggle() -> TimelineViewState {
+    switch self {
+    case .hidden:
+      return .visible
+    case .visible:
+      return .expanded
+    case .expanded:
+      return .hidden
+    }
+  }
+}
+
 struct VersionTimelineView: View {
   let versionStore: VersionStore
   let onVersionSelected: (Version) -> Void
 
   @State private var hoveredIndex: Int?
   @State private var isDragging = false
+
+  @Binding var timelineState: TimelineViewState
 
   var body: some View {
     GeometryReader { geometry in
@@ -16,7 +42,8 @@ struct VersionTimelineView: View {
             version: version,
             isActive: index == versionStore.currentIndex,
             isHovered: hoveredIndex == index,
-            position: nodePosition(for: index, in: geometry.size.height)
+            position: nodePosition(for: index, in: geometry.size.height),
+            timelineState: $timelineState
           )
           .onTapGesture {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -55,10 +82,16 @@ struct VersionTimelineView: View {
               }
           )
       }
-      .glassEffect(.regular.tint(Color.surface).interactive())
-      .frame(width: 44)
-      .padding(.horizontal, 8)
+      .glassEffect(
+        .regular.tint(Color.surface).interactive(),
+        in: .rect(cornerRadius: 22)
+      )
+      .frame(width: timelineState.width)
+      .padding(.leading, 16)
       .padding(.vertical, 8)
+      .opacity(timelineState == .hidden ? 0 : 1)
+      .offset(x: timelineState == .hidden ? -timelineState.width : 0)
+      .animation(.bouncy, value: timelineState)
     }
   }
 
@@ -84,6 +117,8 @@ struct VersionNode: View {
   let isHovered: Bool
   let position: CGFloat
 
+  @Binding var timelineState: TimelineViewState
+
   var nodeColor: Color {
     switch version.changeType {
     case .synonym:
@@ -108,13 +143,24 @@ struct VersionNode: View {
   }
 
   var body: some View {
-    Circle()
-      .fill(nodeColor)
-      .frame(width: nodeSize, height: nodeSize)
-      .shadow(color: Color.successGold.opacity(0.5), radius: isActive ? 2 : 0, x: 0, y: 0)
-      .scaleEffect(isActive ? 1.2 : (isHovered ? 1.1 : 1.0))
-      .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isActive)
-      .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isHovered)
-      .position(x: 22, y: position)
+    HStack {
+      Circle()
+        .fill(nodeColor)
+        .frame(width: nodeSize, height: nodeSize)
+        .shadow(color: Color.successGold.opacity(0.5), radius: isActive ? 2 : 0, x: 0, y: 0)
+
+      if timelineState == .expanded {
+        Text(version.timestamp, format: .relative(presentation: .numeric, unitsStyle: .narrow))
+          .font(.inter(size: 12, relativeTo: .callout))
+          .foregroundColor(.textSecondary)
+          .lineLimit(1)
+
+        Spacer()
+      }
+    }
+    .scaleEffect(isActive ? 1.2 : (isHovered ? 1.1 : 1.0))
+    .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isActive)
+    .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isHovered)
+    .position(x: timelineState == .expanded ? 70 : 22, y: position)
   }
 }

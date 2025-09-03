@@ -5,13 +5,12 @@ struct EditorView: View {
   private let document: Document
 
   @State private var text = ""
+  @State private var timelineState: TimelineViewState = .visible
 
   @State private var editorController: EditorController
   @State private var versionStore: VersionStore
-  @State private var isTimelineVisible = true
   @State private var isFirstLaunch = true
 
-  private let timelineWidth: CGFloat = 44
   private let textPadding: CGFloat = 24
 
   init(document: Document, documentStore: DocumentStore) {
@@ -40,12 +39,9 @@ struct EditorView: View {
         versionStore: versionStore,
         onVersionSelected: { version in
           editorController.restoreVersion(version)
-        }
+        },
+        timelineState: $timelineState
       )
-      .frame(width: timelineWidth)
-      .opacity(isTimelineVisible ? 1 : 0)
-      .offset(x: isTimelineVisible ? 0 : -timelineWidth)
-      .animation(.bouncy, value: isTimelineVisible)
     }
     .contentShape(Rectangle())
     .gesture(
@@ -53,8 +49,15 @@ struct EditorView: View {
         .onEnded { value in
           let horizontalTranslation = value.translation.width
           let isDraggingRight = horizontalTranslation > 0
-          let newTimelineVisibility = isDraggingRight
-          isTimelineVisible = newTimelineVisibility
+          if isDraggingRight {
+            if timelineState == .visible {
+              timelineState = .expanded
+            } else {
+              timelineState = .visible
+            }
+          } else {
+            timelineState = .hidden
+          }
         }
     )
     .background(Color.background)
@@ -86,8 +89,8 @@ struct EditorView: View {
   private var textEditor: some View {
     MagneticTextEditor(text: $text, editorController: editorController)
       .padding(.trailing, textPadding)
-      .padding(.leading, (isTimelineVisible ? timelineWidth : 0) + textPadding)
-      .animation(.bouncy, value: isTimelineVisible)
+      .padding(.leading, timelineState == .hidden ? textPadding : timelineState.width + textPadding)
+      .animation(.bouncy, value: timelineState)
   }
 
   private var titleView: some View {
@@ -97,7 +100,7 @@ struct EditorView: View {
       .contentTransition(.interpolate)
       .animation(.bouncy, value: document.title)
       .onTapGesture {
-        isTimelineVisible.toggle()
+        timelineState = timelineState.toggle()
       }
   }
 
@@ -116,7 +119,7 @@ struct EditorView: View {
     .font(.inter(size: 12, relativeTo: .caption))
     .foregroundStyle(.textSecondary)
     .onTapGesture {
-      isTimelineVisible.toggle()
+      timelineState = timelineState.toggle()
     }
   }
 
@@ -128,7 +131,7 @@ struct EditorView: View {
       )
       .font(.literata(size: 26, relativeTo: .body))
       .foregroundStyle(.textSecondary)
-      .padding(.leading, (isTimelineVisible ? timelineWidth : 0) + textPadding)
+      .padding(.leading, timelineState == .hidden ? textPadding : timelineState.width + textPadding)
       .padding(.trailing, textPadding)
     }
   }
