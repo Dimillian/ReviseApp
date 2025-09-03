@@ -51,7 +51,7 @@ final class VersionStore {
       let data = try Data(contentsOf: versionsFile)
       let savedData = try decoder.decode(SavedVersionData.self, from: data)
       self.versions = savedData.versions
-      self.currentIndex = savedData.currentIndex
+      self.currentIndex = versions.isEmpty ? -1 : versions.count - 1
     } catch {
       print("Failed to load versions: \(error)")
     }
