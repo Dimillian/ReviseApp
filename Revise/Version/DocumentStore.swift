@@ -70,7 +70,7 @@ final class DocumentStore {
       }
       return nil
     }
-    .sorted { $0.title < $1.title }
+    .sorted { $0.lastEdited > $1.lastEdited }
   }
 
   func createDocument(withTitle title: String? = nil) -> Document {
@@ -86,7 +86,7 @@ final class DocumentStore {
 
     // Add to list
     documents.append(document)
-    documents.sort { $0.title < $1.title }
+    documents.sort { $0.lastEdited > $1.lastEdited }
 
     return document
   }
@@ -117,6 +117,8 @@ final class DocumentStore {
     } catch {
       print("Failed to save document metadata: \(error)")
     }
+
+    documents.sort { $0.lastEdited > $1.lastEdited }
   }
 
   func documentExists(withId id: String) -> Bool {

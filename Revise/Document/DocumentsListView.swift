@@ -16,6 +16,11 @@ struct DocumentsListView: View {
           VStack(alignment: .leading) {
             Text(document.title)
               .font(.literata(size: 16, relativeTo: .body))
+            if document.versions > 0 {
+              Text("\(document.wordsCount) words  •  \(document.versions) versions")
+                .font(.inter(size: 12, relativeTo: .caption))
+                .foregroundColor(.textSecondary)
+            }
           }
         }
         .listRowBackground(Color.clear)

@@ -59,7 +59,7 @@ struct Thesaurus {
 
   func initialTitle() async throws -> String {
     let prompt: String = """
-      Return a simple to world title for a new document. 
+      Return a simple two words title for a new document. 
       Like "Sigma Alpha". 
       Two random words.
       Don't wrap it in any JSON, simply return the title as a string, without any quotation marks.

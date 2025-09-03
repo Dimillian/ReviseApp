@@ -121,6 +121,11 @@ final class VersionStore {
       cursorPosition: cursorPosition,
       selectedRange: selectedRange
     )
+
+    document.wordsCount = version.metadata.wordCount
+    document.versions = versions.count + 1
+    document.lastEdited = Date()
+
     addVersion(version)
   }
 
