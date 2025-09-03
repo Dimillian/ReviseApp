@@ -60,7 +60,7 @@ struct EditorView: View {
           }
         }
     )
-    .background(Color.background)
+    .background(Color.background.edgesIgnoringSafeArea(.all))
     .toolbar {
       ToolbarItem(placement: .title) {
         titleView
