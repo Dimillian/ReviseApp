@@ -6,20 +6,14 @@ final class VersionStore {
   private(set) var versions: [Version] = []
   private(set) var currentIndex: Int = -1
   private(set) var document: Document
+  private let documentStore: DocumentStore
 
   // Storage
-  private let fileManager = FileManager.default
-  private var documentsDirectory: URL {
-    fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-  }
-  private var versionsDirectory: URL {
-    documentsDirectory.appendingPathComponent("Versions")
-  }
   private var documentDirectory: URL {
-    versionsDirectory.appendingPathComponent(document.id)
+    DocumentStore.documentDirectory(for: document.id)
   }
   private var versionsFile: URL {
-    documentDirectory.appendingPathComponent("versions.json")
+    DocumentStore.versionsFile(for: document.id)
   }
 
   var currentVersion: Version? {
@@ -44,31 +38,14 @@ final class VersionStore {
 
   // MARK: - Initialization
 
-  init(document: Document) {
+  init(document: Document, documentStore: DocumentStore) {
     self.document = document
-    setupStorage()
+    self.documentStore = documentStore
     loadVersions()
   }
 
-  private func setupStorage() {
-    // Create directories if they don't exist
-    try? fileManager.createDirectory(at: documentDirectory, withIntermediateDirectories: true)
-  }
-
   private func loadVersions() {
-    // Load document metadata if it exists
-    let documentFile = documentDirectory.appendingPathComponent("document.json")
-    if fileManager.fileExists(atPath: documentFile.path) {
-      do {
-        let data = try Data(contentsOf: documentFile)
-        self.document = try decoder.decode(Document.self, from: data)
-      } catch {
-        print("Failed to load document metadata: \(error)")
-      }
-    }
-
-    // Load versions
-    guard fileManager.fileExists(atPath: versionsFile.path) else { return }
+    guard DocumentStore.fileManager.fileExists(atPath: versionsFile.path) else { return }
 
     do {
       let data = try Data(contentsOf: versionsFile)
@@ -88,10 +65,8 @@ final class VersionStore {
       let versionsData = try encoder.encode(savedData)
       try versionsData.write(to: versionsFile)
 
-      // Save document metadata
-      let documentFile = documentDirectory.appendingPathComponent("document.json")
-      let documentData = try encoder.encode(document)
-      try documentData.write(to: documentFile)
+      // Save document metadata using DocumentStore
+      documentStore.saveDocument(document)
     } catch {
       print("Failed to save versions: \(error)")
     }
@@ -130,6 +105,7 @@ final class VersionStore {
 
     lastEditTime = Date()
     saveVersions()
+    documentStore.saveDocument(document)
   }
 
   func createVersion(
@@ -179,60 +155,6 @@ final class VersionStore {
     currentIndex = -1
     lastEditTime = nil
     saveVersions()
-  }
-
-  // MARK: - Document Management
-
-  func switchToDocument(_ newDocument: Document) {
-    // Save current document's versions
-    saveVersions()
-
-    // Switch to new document
-    self.document = newDocument
-    setupStorage()
-
-    // Clear current state
-    versions.removeAll()
-    currentIndex = -1
-    lastEditTime = nil
-
-    // Load new document's versions
-    loadVersions()
-  }
-
-  static func listDocuments() -> [Document] {
-    let fileManager = FileManager.default
-    let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-    let versionsDirectory = documentsDirectory.appendingPathComponent("Versions")
-
-    guard
-      let contents = try? fileManager.contentsOfDirectory(
-        at: versionsDirectory,
-        includingPropertiesForKeys: [.isDirectoryKey],
-        options: .skipsHiddenFiles
-      )
-    else {
-      return []
-    }
-
-    return contents.compactMap { url in
-      var isDirectory: ObjCBool = false
-      if fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory),
-        isDirectory.boolValue
-      {
-        // Try to load document metadata
-        let documentFile = url.appendingPathComponent("document.json")
-        if let data = try? Data(contentsOf: documentFile),
-          let document = try? JSONDecoder().decode(Document.self, from: data)
-        {
-          return document
-        } else {
-          // Fallback for documents without metadata
-          return Document(id: url.lastPathComponent)
-        }
-      }
-      return nil
-    }
   }
 
   // MARK: - Private Methods

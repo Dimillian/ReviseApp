@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct EditorView: View {
+  private let documentStore: DocumentStore
   private let document: Document
 
   @State private var text = ""
@@ -13,71 +14,71 @@ struct EditorView: View {
   private let timelineWidth: CGFloat = 44
   private let textPadding: CGFloat = 24
 
-  init(document: Document) {
+  init(document: Document, documentStore: DocumentStore) {
     self.document = document
-    let versionStore = VersionStore(document: document)
+    self.documentStore = documentStore
+    let versionStore = VersionStore(document: document, documentStore: documentStore)
     let editorController = EditorController(versionStore: versionStore)
     _versionStore = State(initialValue: versionStore)
     _editorController = State(initialValue: editorController)
   }
 
   var body: some View {
-    NavigationStack {
-      ZStack(alignment: .leading) {
-        ScrollView(.vertical) {
-          ZStack(alignment: .topLeading) {
-            if text.isEmpty {
-              welcomeView
-            }
-            textEditor
+    ZStack(alignment: .leading) {
+      ScrollView(.vertical) {
+        ZStack(alignment: .topLeading) {
+          if text.isEmpty {
+            welcomeView
           }
+          textEditor
         }
-        .scrollContentBackground(.hidden)
-        .scrollDismissesKeyboard(.interactively)
+      }
+      .scrollContentBackground(.hidden)
+      .scrollDismissesKeyboard(.interactively)
 
-        VersionTimelineView(
-          versionStore: versionStore,
-          onVersionSelected: { version in
-            editorController.restoreVersion(version)
-          }
-        )
-        .frame(width: timelineWidth)
-        .opacity(isTimelineVisible ? 1 : 0)
-        .offset(x: isTimelineVisible ? 0 : -timelineWidth)
-        .animation(.bouncy, value: isTimelineVisible)
-      }
-      .contentShape(Rectangle())
-      .gesture(
-        DragGesture(minimumDistance: 2)
-          .onEnded { value in
-            let horizontalTranslation = value.translation.width
-            let isDraggingRight = horizontalTranslation > 0
-            let newTimelineVisibility = isDraggingRight
-            isTimelineVisible = newTimelineVisibility
-          }
+      VersionTimelineView(
+        versionStore: versionStore,
+        onVersionSelected: { version in
+          editorController.restoreVersion(version)
+        }
       )
-      .background(Color.background)
-      .toolbar {
-        ToolbarItem(placement: .title) {
-          titleView
+      .frame(width: timelineWidth)
+      .opacity(isTimelineVisible ? 1 : 0)
+      .offset(x: isTimelineVisible ? 0 : -timelineWidth)
+      .animation(.bouncy, value: isTimelineVisible)
+    }
+    .contentShape(Rectangle())
+    .gesture(
+      DragGesture(minimumDistance: 2)
+        .onEnded { value in
+          let horizontalTranslation = value.translation.width
+          let isDraggingRight = horizontalTranslation > 0
+          let newTimelineVisibility = isDraggingRight
+          isTimelineVisible = newTimelineVisibility
         }
-        ToolbarItem(placement: .subtitle) {
-          subtitleView
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-          ShareLink(document.title, item: text)
-        }
+    )
+    .background(Color.background)
+    .toolbar {
+      ToolbarItem(placement: .title) {
+        titleView
       }
-      .onAppear {
-        if text.isEmpty {
-          editorController.generateInitialTitle()
-        }
+      ToolbarItem(placement: .subtitle) {
+        subtitleView
       }
-      .scrollEdgeEffectStyle(.soft, for: .top)
-      .onChange(of: text) {
-        if !text.isEmpty {
-          isFirstLaunch = false
-        }
+      ToolbarItem(placement: .topBarTrailing) {
+        ShareLink(document.title, item: text)
+      }
+    }
+    .scrollEdgeEffectStyle(.soft, for: .top)
+    .onChange(of: text) {
+      if !text.isEmpty {
+        isFirstLaunch = false
+      }
+    }
+    .onAppear {
+      if let latestVersion = versionStore.versions.last {
+        editorController.restoreVersion(latestVersion)
+        isFirstLaunch = false
       }
     }
   }

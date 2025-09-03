@@ -37,15 +37,6 @@ final class EditorController: NSObject {
     super.init()
   }
 
-  func generateInitialTitle() {
-    if versionStore.document.title.isEmpty {
-      Task {
-        let title = try? await thesaurus.initialTitle()
-        versionStore.document.title = title ?? ""
-      }
-    }
-  }
-
   func handleWordSelection(at range: UITextRange) {
     guard let textView else { return }
     textViewDidChangeSelection(textView)
