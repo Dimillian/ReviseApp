@@ -118,7 +118,9 @@ final class DocumentStore {
       print("Failed to save document metadata: \(error)")
     }
 
-    documents.sort { $0.lastEdited > $1.lastEdited }
+    Task { @MainActor in
+      documents.sort { $0.lastEdited > $1.lastEdited }
+    }
   }
 
   func documentExists(withId id: String) -> Bool {

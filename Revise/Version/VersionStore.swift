@@ -46,6 +46,8 @@ final class VersionStore {
   private var lastEditTime: Date?
   private let encoder = JSONEncoder()
   private let decoder = JSONDecoder()
+  // Dedicated serial queue for atomic disk I/O
+  private let ioQueue = DispatchQueue(label: "com.revise.versionstore.io", qos: .utility)
 
   // MARK: - Initialization
 
@@ -100,26 +102,26 @@ final class VersionStore {
     // Keep document metadata in sync
     document.branches = branches.count
 
-    let saved = SavedData(
+    let snapshot = SavedData(
       branches: branches,
       branchStates: branchStates,
       currentBranch: currentBranch
     )
 
-    do {
-      // Save versions
-      let versionsData = try encoder.encode(saved)
-      try versionsData.write(to: versionsFile)
+    let versionsURL = versionsFile
 
-      // Save document metadata using DocumentStore
-      documentStore.saveDocument(document)
-    } catch {
-      print("Failed to save versions: \(error)")
+    let data = try? encoder.encode(snapshot)
+
+    ioQueue.async { [weak self] in
+      guard let self, let data else { return }
+
+      try? data.write(to: versionsURL, options: .atomic)
+
+      self.documentStore.saveDocument(self.document)
     }
   }
 
-  // Branch-aware format (current)
-  private struct SavedData: Codable {
+  private struct SavedData: Codable, Sendable {
     let branches: [String: Branch]
     let branchStates: [String: BranchState]
     let currentBranch: String
