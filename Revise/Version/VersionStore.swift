@@ -3,8 +3,19 @@ import SwiftUI
 
 @Observable
 final class VersionStore {
+  // Current branch state (kept in sync with maps below)
   private(set) var versions: [Version] = []
   private(set) var currentIndex: Int = -1
+  private(set) var currentBranch: String = Branch.main
+
+  // All branches data
+  private struct BranchState: Codable, Equatable {
+    var versions: [Version]
+    var currentIndex: Int
+  }
+
+  private var branchStates: [String: BranchState] = [:]
+  private(set) var branches: [String: Branch] = [:]
   private(set) var document: Document
   private let documentStore: DocumentStore
 
@@ -45,24 +56,59 @@ final class VersionStore {
   }
 
   private func loadVersions() {
-    guard DocumentStore.fileManager.fileExists(atPath: versionsFile.path) else { return }
+    // Start with a default empty structure
+    func initializeEmptyMain() {
+      self.currentBranch = Branch.main
+      self.branches = [Branch.main: Branch(id: Branch.main, ref: Branch.main, baseVersionId: nil)]
+      self.branchStates = [Branch.main: BranchState(versions: [], currentIndex: -1)]
+      self.versions = []
+      self.currentIndex = -1
+    }
+
+    guard DocumentStore.fileManager.fileExists(atPath: versionsFile.path) else {
+      initializeEmptyMain()
+      return
+    }
 
     do {
       let data = try Data(contentsOf: versionsFile)
-      let savedData = try decoder.decode(SavedVersionData.self, from: data)
-      self.versions = savedData.versions
-      self.currentIndex = versions.isEmpty ? -1 : versions.count - 1
+      let saved = try decoder.decode(SavedData.self, from: data)
+      self.branches = saved.branches
+      self.branchStates = saved.branchStates
+      self.currentBranch = saved.currentBranch
+
+      if branches[Branch.main] == nil {
+        branches[Branch.main] = Branch(id: Branch.main, ref: Branch.main, baseVersionId: nil)
+      }
+
+      let state = branchStates[currentBranch] ?? BranchState(versions: [], currentIndex: -1)
+      self.versions = state.versions
+      self.currentIndex = state.currentIndex
+      // Keep document metadata in sync
+      self.document.branches = branches.count
     } catch {
-      print("Failed to load versions: \(error)")
+      // Destructive migration: if decode fails, reinitialize to empty main.
+      initializeEmptyMain()
+      saveVersions()
     }
   }
 
   private func saveVersions() {
-    let savedData = SavedVersionData(versions: versions, currentIndex: currentIndex)
+    // Keep state in sync with current branch view
+    branchStates[currentBranch] = BranchState(versions: versions, currentIndex: currentIndex)
+
+    // Keep document metadata in sync
+    document.branches = branches.count
+
+    let saved = SavedData(
+      branches: branches,
+      branchStates: branchStates,
+      currentBranch: currentBranch
+    )
 
     do {
       // Save versions
-      let versionsData = try encoder.encode(savedData)
+      let versionsData = try encoder.encode(saved)
       try versionsData.write(to: versionsFile)
 
       // Save document metadata using DocumentStore
@@ -72,9 +118,11 @@ final class VersionStore {
     }
   }
 
-  private struct SavedVersionData: Codable {
-    let versions: [Version]
-    let currentIndex: Int
+  // Branch-aware format (current)
+  private struct SavedData: Codable {
+    let branches: [String: Branch]
+    let branchStates: [String: BranchState]
+    let currentBranch: String
   }
 
   // MARK: - Public Methods
@@ -120,7 +168,8 @@ final class VersionStore {
       changeType: changeType,
       cursorPosition: cursorPosition,
       selectedRange: selectedRange,
-      highlightedRange: highlightedRange
+      highlightedRange: highlightedRange,
+      branch: currentBranch
     )
 
     document.wordsCount = version.metadata.wordCount
@@ -160,6 +209,60 @@ final class VersionStore {
     versions.removeAll()
     currentIndex = -1
     lastEditTime = nil
+    saveVersions()
+  }
+
+  // MARK: - Branch Management
+
+  @discardableResult
+  func createBranch(named name: String) -> Branch {
+    // Normalize and ensure uniqueness
+    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    let branchName = trimmed.isEmpty ? UUID().uuidString : trimmed
+
+    if let existing = branches[branchName] { return existing }
+
+    let baseVersionId = currentVersion?.id
+    let branch = Branch(id: branchName, ref: currentBranch, baseVersionId: baseVersionId)
+    branches[branchName] = branch
+
+    // Seed new branch with current snapshot (if any)
+    if let seed = currentVersion {
+      // Create a fresh version on the new branch seeded with current text
+      let seededVersion = Version(
+        text: seed.text,
+        changeType: .manual,
+        cursorPosition: seed.metadata.cursorPosition,
+        selectedRange: seed.metadata.selectedRange,
+        highlightedRange: seed.metadata.highlightedRange,
+        branch: branchName
+      )
+      branchStates[branchName] = BranchState(versions: [seededVersion], currentIndex: 0)
+    } else {
+      branchStates[branchName] = BranchState(versions: [], currentIndex: -1)
+    }
+
+    saveVersions()
+    return branch
+  }
+
+  func switchBranch(to name: String) {
+    guard name != currentBranch else { return }
+    // Ensure branch exists
+    if branches[name] == nil {
+      // Auto-create empty branch that references current
+      _ = createBranch(named: name)
+    }
+
+    // Persist current view into maps
+    branchStates[currentBranch] = BranchState(versions: versions, currentIndex: currentIndex)
+
+    // Switch current branch view
+    currentBranch = name
+    let state = branchStates[currentBranch] ?? BranchState(versions: [], currentIndex: -1)
+    versions = state.versions
+    currentIndex = state.currentIndex
+
     saveVersions()
   }
 

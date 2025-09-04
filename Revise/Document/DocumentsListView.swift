@@ -16,11 +16,19 @@ struct DocumentsListView: View {
           VStack(alignment: .leading) {
             Text(document.title)
               .font(.literata(size: 16, relativeTo: .body))
-            if document.versions > 0 {
-              Text("\(document.wordsCount) words  •  \(document.versions) versions")
-                .font(.inter(size: 12, relativeTo: .caption))
-                .foregroundColor(.textSecondary)
+            HStack(spacing: 0) {
+              Text(
+                document.lastEdited, format: .relative(presentation: .numeric, unitsStyle: .narrow)
+              )
+              if document.versions > 0 {
+                Text("  •  ")
+                Text(
+                  "\(document.wordsCount) \(document.wordsCount == 1 ? "word" : "words")  •  \(document.versions) \(document.versions == 1 ? "version" : "versions")  •  \(document.branches) \(document.branches == 1 ? "branch" : "branches")"
+                )
+              }
             }
+            .font(.inter(size: 12, relativeTo: .caption))
+            .foregroundColor(.textSecondary)
           }
         }
         .listRowBackground(Color.clear)

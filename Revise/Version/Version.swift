@@ -7,6 +7,8 @@ struct Version: Identifiable, Equatable, Codable {
   let text: String
   let changeType: ChangeType
   let metadata: ChangeMetadata
+  // Name of the branch this version belongs to
+  let branch: String
 
   enum ChangeType: Equatable, Codable {
     case manual
@@ -35,7 +37,12 @@ struct Version: Identifiable, Equatable, Codable {
   }
 
   init(
-    text: String, changeType: ChangeType, cursorPosition: Int? = nil, selectedRange: NSRange? = nil, highlightedRange: NSRange? = nil
+    text: String,
+    changeType: ChangeType,
+    cursorPosition: Int? = nil,
+    selectedRange: NSRange? = nil,
+    highlightedRange: NSRange? = nil,
+    branch: String = Branch.main
   ) {
     self.id = UUID().uuidString
     self.timestamp = Date()
@@ -43,6 +50,7 @@ struct Version: Identifiable, Equatable, Codable {
     self.changeType = changeType
     self.metadata = ChangeMetadata(
       from: text, cursorPosition: cursorPosition, selectedRange: selectedRange, highlightedRange: highlightedRange)
+    self.branch = branch
   }
 }
 

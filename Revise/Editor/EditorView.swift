@@ -115,6 +115,8 @@ struct EditorView: View {
         .contentTransition(.numericText(value: Double(versionStore.versions.count)))
         .animation(.bouncy, value: versionStore.versions.count)
       Text(versionStore.versions.count == 1 ? " version" : " versions")
+      Text("  •  ")
+      Text("\(versionStore.currentBranch)")
     }
     .font(.inter(size: 12, relativeTo: .caption))
     .foregroundStyle(.textSecondary)
