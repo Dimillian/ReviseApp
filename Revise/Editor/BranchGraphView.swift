@@ -74,7 +74,10 @@ struct BranchGraphView: View {
       .gesture(
         MagnificationGesture()
           .onChanged { value in
-            if !didHapticZoom { UIImpactFeedbackGenerator(style: .soft).impactOccurred(); didHapticZoom = true }
+            if !didHapticZoom {
+              UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+              didHapticZoom = true
+            }
             scale = (lastScale * value).clamped(to: 0.5...2.0)
           }
           .onEnded { value in
@@ -134,22 +137,23 @@ private struct BranchNodeTile: View {
   let onTap: () -> Void
 
   var body: some View {
-    Button(action: onTap) {
-      VStack(alignment: .leading, spacing: 8) {
-        Text(title)
-          .font(.inter(size: 10, relativeTo: .caption))
-          .foregroundStyle(.textSecondary)
-        Text(preview)
-          .font(.literata(size: 12, relativeTo: .body))
-          .foregroundStyle(.textPrimary)
-          .lineLimit(5)
-          .multilineTextAlignment(.leading)
-      }
-      .frame(width: 180, height: 110, alignment: .topLeading)
-      .padding(12)
-      .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+    VStack(alignment: .leading, spacing: 8) {
+      Text(title)
+        .font(.inter(size: 10, relativeTo: .caption))
+        .foregroundStyle(.textSecondary)
+      Text(preview)
+        .font(.literata(size: 12, relativeTo: .body))
+        .foregroundStyle(.textPrimary)
+        .lineLimit(5)
+        .multilineTextAlignment(.leading)
     }
-    .buttonStyle(.plain)
+    .frame(width: 180, height: 110, alignment: .topLeading)
+    .padding(12)
+    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+    .contentShape(Rectangle())
+    .onTapGesture {
+      onTap()
+    }
   }
 }
 
