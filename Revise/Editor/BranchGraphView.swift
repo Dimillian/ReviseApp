@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct BranchGraphView: View {
   let versionStore: VersionStore
@@ -7,6 +8,7 @@ struct BranchGraphView: View {
   // Zoom state
   @State private var scale: CGFloat = 1.0
   @State private var lastScale: CGFloat = 1.0
+  @State private var didHapticZoom = false
 
   // Layout constants (scaled down for denser map)
   private let nodeSize = CGSize(width: 180, height: 110)
@@ -72,10 +74,13 @@ struct BranchGraphView: View {
       .gesture(
         MagnificationGesture()
           .onChanged { value in
+            if !didHapticZoom { UIImpactFeedbackGenerator(style: .soft).impactOccurred(); didHapticZoom = true }
             scale = (lastScale * value).clamped(to: 0.5...2.0)
           }
           .onEnded { value in
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             lastScale = (lastScale * value).clamped(to: 0.5...2.0)
+            didHapticZoom = false
           }
       )
       .padding(40)

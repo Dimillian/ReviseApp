@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct EditorView: View {
   private let documentStore: DocumentStore
@@ -10,6 +11,7 @@ struct EditorView: View {
   @State private var editorScale: CGFloat = 1.0
   @State private var baseScale: CGFloat = 1.0
   @State private var isGraphVisible: Bool = false
+  @State private var didHapticReveal: Bool = false
 
   @State private var editorController: EditorController
   @State private var versionStore: VersionStore
@@ -62,6 +64,7 @@ struct EditorView: View {
         BranchGraphView(
           versionStore: versionStore,
           onSelectBranch: { name in
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             versionStore.switchBranch(to: name)
             if let latest = versionStore.currentVersion
               ?? versionStore.latestVersion(forBranch: name)
@@ -222,8 +225,12 @@ extension EditorView {
         editorScale = target
         // Reveal the graph once we pass a threshold
         let revealThreshold: CGFloat = 0.92
-        withAnimation(.smooth(duration: 0.15)) {
-          isGraphVisible = target < revealThreshold
+        let willReveal = target < revealThreshold
+        withAnimation(.smooth(duration: 0.15)) { isGraphVisible = willReveal }
+        // Haptic on reveal threshold cross
+        if willReveal && !didHapticReveal {
+          UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+          didHapticReveal = true
         }
       }
       .onEnded { scale in
@@ -234,14 +241,17 @@ extension EditorView {
             editorScale = 0.75
             isGraphVisible = true
           }
+          UIImpactFeedbackGenerator(style: .medium).impactOccurred()
           baseScale = editorScale
         } else {
           withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
             editorScale = 1.0
             isGraphVisible = false
           }
+          UINotificationFeedbackGenerator().notificationOccurred(.success)
           baseScale = 1.0
         }
+        didHapticReveal = false
       }
   }
 }
