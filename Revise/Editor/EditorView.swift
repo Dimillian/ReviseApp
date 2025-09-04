@@ -11,6 +11,8 @@ struct EditorView: View {
   @State private var versionStore: VersionStore
   @State private var isFirstLaunch = true
 
+  @State private var isMenuLoading = false
+
   private let textPadding: CGFloat = 24
 
   init(document: Document, documentStore: DocumentStore) {
@@ -69,7 +71,7 @@ struct EditorView: View {
         subtitleView
       }
       ToolbarItem(placement: .topBarTrailing) {
-        ShareLink(document.title, item: text)
+        menuButton
       }
     }
     .scrollEdgeEffectStyle(.soft, for: .top)
@@ -135,6 +137,41 @@ struct EditorView: View {
       .foregroundStyle(.textSecondary)
       .padding(.leading, timelineState == .hidden ? textPadding : timelineState.width + textPadding)
       .padding(.trailing, textPadding)
+    }
+  }
+
+  private var menuButton: some View {
+    Menu {
+      Button("New Branch", systemImage: "plus") {
+        Task {
+          isMenuLoading = true
+          await editorController.createNewBranch()
+          isMenuLoading = false
+        }
+      }
+      Menu {
+        ForEach(versionStore.branches.map { $0.key }, id: \.self) { branch in
+          Button(branch, systemImage: "branch") {
+            editorController.switchBranch(to: branch)
+          }
+        }
+      } label: {
+        Label("Branches", systemImage: "branch")
+      }
+      Button("Undo", systemImage: "arrow.uturn.left") {
+        editorController.undo()
+      }
+      Button("Redo", systemImage: "arrow.uturn.right") {
+        editorController.redo()
+      }
+      Divider()
+      ShareLink("Share", item: text)
+    } label: {
+      if isMenuLoading {
+        ProgressView()
+      } else {
+        Image(systemName: "ellipsis")
+      }
     }
   }
 }

@@ -105,6 +105,21 @@ final class EditorController: NSObject {
     }
   }
 
+  func createNewBranch() async {
+    let title = try? await thesaurus.branchTitle()
+    if let title {
+      versionStore.createBranch(named: title)
+      versionStore.switchBranch(to: title)
+    }
+  }
+
+  func switchBranch(to branch: String) {
+    versionStore.switchBranch(to: branch)
+    if let version = versionStore.currentVersion {
+      restoreVersion(version)
+    }
+  }
+
   func updateDefaultAttributes(font: UIFont? = nil, textColor: UIColor? = nil) {
     highlightManager.updateDefaultAttributes(font: font, textColor: textColor)
 

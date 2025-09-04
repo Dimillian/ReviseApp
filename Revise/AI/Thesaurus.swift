@@ -69,4 +69,17 @@ struct Thesaurus {
 
     return response.content
   }
+
+  func branchTitle() async throws -> String {
+    let prompt: String = """
+      Return a simple two words title for a new branch of a document. 
+      Like "Elipson Orange". 
+      Two random words.
+      Don't wrap it in any JSON, simply return the title as a string, without any quotation marks.
+      """
+
+    let response = try await session.respond(to: prompt)
+
+    return response.content
+  }
 }
