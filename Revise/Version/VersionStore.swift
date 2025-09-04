@@ -305,4 +305,224 @@ final class VersionStore {
     let start = max(0, versions.count - count)
     return Array(versions[start..<versions.count])
   }
+
+  // MARK: - Branch Helpers (public read-only)
+
+  /// Ordered list of branch identifiers, with main first
+  var branchIds: [String] {
+    let others = branches.keys.filter { $0 != Branch.main }.sorted()
+    return [Branch.main] + others
+  }
+
+  /// Latest version in a specific branch without switching context
+  func latestVersion(forBranch name: String) -> Version? {
+    branchStates[name]?.versions.last
+  }
+
+  /// Generate a branch preview focusing on the most relevant changed text.
+  /// Strategy:
+  /// - Use latest version's highlightedRange if available (manual/synonym edits)
+  /// - Else, diff against baseVersion in the reference branch and show around divergence
+  /// - Else, show the tail of the text
+  func preview(forBranch name: String, maxChars: Int = 140) -> String {
+    guard let latest = latestVersion(forBranch: name) else { return "" }
+    let text = latest.text as NSString
+    let fullLen = text.length
+
+    // 1) Prefer latest highlighted range (recent manual/synonym edits)
+    if let hr = latest.metadata.highlightedRange, hr.length > 0, hr.location != NSNotFound {
+      let context = max(20, maxChars / 3)
+      let start = max(0, hr.location - context)
+      let end = min(fullLen, hr.location + hr.length + context)
+      var snippet = text.substring(with: NSRange(location: start, length: end - start))
+      if start > 0 { snippet = "… " + snippet }
+      if end < fullLen { snippet += " …" }
+      return snippet
+    }
+
+    // 2) Compare against base in reference branch to find divergence
+    if let branch = branches[name],
+      let baseId = branch.baseVersionId,
+      let refState = branchStates[branch.ref],
+      let base = refState.versions.first(where: { $0.id == baseId })
+    {
+      let baseText = base.text as NSString
+      let lcp = longestCommonPrefixLength(a: text, b: baseText)
+      let pivot = min(max(0, lcp), fullLen)
+      // Center window around pivot
+      let half = maxChars / 2
+      let start = max(0, pivot - half)
+      let end = min(fullLen, start + maxChars)
+      var snippet = text.substring(with: NSRange(location: start, length: end - start))
+      if start > 0 { snippet = "… " + snippet }
+      if end < fullLen { snippet += " …" }
+      return snippet
+    }
+
+    // 3) Fallback to tail of the text
+    if fullLen <= maxChars { return text as String }
+    let start = max(0, fullLen - maxChars)
+    let snippet = text.substring(with: NSRange(location: start, length: fullLen - start))
+    return "… " + snippet
+  }
+
+  private func longestCommonPrefixLength(a: NSString, b: NSString) -> Int {
+    let minLen = min(a.length, b.length)
+    var i = 0
+    while i < minLen {
+      if a.character(at: i) != b.character(at: i) { break }
+      i += 1
+    }
+    return i
+  }
+
+  // MARK: - Attributed Previews
+
+  /// Like `preview(forBranch:)` but returns an AttributedString with emphasis color on the changed segment.
+  func previewAttributed(forBranch name: String, maxChars: Int = 140) -> AttributedString {
+    guard let latest = latestVersion(forBranch: name) else { return AttributedString("") }
+    let text = latest.text as NSString
+    let fullLen = text.length
+
+    var snippetRange = NSRange(location: 0, length: min(fullLen, maxChars))
+    var highlightRangeInSnippet: NSRange? = nil
+
+    // 1) If we have a highlighted change in the latest version, window around it
+    if let hr = latest.metadata.highlightedRange, hr.length > 0, hr.location != NSNotFound {
+      let context = max(20, maxChars / 3)
+      let start = max(0, hr.location - context)
+      let end = min(fullLen, hr.location + hr.length + context)
+      snippetRange = NSRange(location: start, length: end - start)
+      highlightRangeInSnippet = NSRange(
+        location: hr.location - start, length: min(hr.length, snippetRange.length))
+    } else if let branch = branches[name],
+      let baseId = branch.baseVersionId,
+      let refState = branchStates[branch.ref],
+      let base = refState.versions.first(where: { $0.id == baseId })
+    {
+      // 2) Otherwise, window around divergence pivot
+      let baseText = base.text as NSString
+      let lcp = longestCommonPrefixLength(a: text, b: baseText)
+      let pivot = min(max(0, lcp), fullLen)
+      let half = maxChars / 2
+      let start = max(0, pivot - half)
+      let end = min(fullLen, start + maxChars)
+      snippetRange = NSRange(location: start, length: end - start)
+      let hlStart = max(0, pivot - start)
+      let hlLen = min(24, snippetRange.length - hlStart)
+      if hlLen > 0 { highlightRangeInSnippet = NSRange(location: hlStart, length: hlLen) }
+    } else {
+      // 3) Fallback: tail
+      if fullLen > maxChars {
+        let start = max(0, fullLen - maxChars)
+        snippetRange = NSRange(location: start, length: fullLen - start)
+      }
+    }
+
+    var output = text.substring(with: snippetRange)
+    if snippetRange.location > 0 { output = "… " + output }
+    if snippetRange.location + snippetRange.length < fullLen { output += " …" }
+
+    var attr = AttributedString(output)
+    if let hr = highlightRangeInSnippet {
+      // Adjust for leading ellipsis prefix
+      let lead = snippetRange.location > 0 ? 2 : 0  // "… " length
+      let start = hr.location + lead
+      if start >= 0, start < attr.characters.count {
+        let from = attr.index(attr.startIndex, offsetByCharacters: start)
+        let to = attr.index(
+          from, offsetByCharacters: min(hr.length, max(0, attr.characters.count - start)))
+        let range = from..<to
+        attr[range].foregroundColor = .accentBlue
+      }
+    }
+    return attr
+  }
+
+  // MARK: - Branch Graph (nodes + edges)
+
+  struct BranchNode: Identifiable, Equatable {
+    let id: String
+    let ref: String
+    let baseVersionId: String?
+    let createdAt: Date
+    let level: Int
+    let order: Int
+  }
+
+  struct BranchEdge: Hashable {
+    let from: String  // parent branch id
+    let to: String  // child branch id
+  }
+
+  /// Compute a simple hierarchical graph of branches starting from main.
+  func branchGraph() -> (nodes: [BranchNode], edges: [BranchEdge]) {
+    // Build adjacency from ref -> [child]
+    var children: [String: [Branch]] = [:]
+    for (_, br) in branches {
+      children[br.ref, default: []].append(br)
+    }
+
+    // BFS from main to assign levels; sort children by createdAt for stability
+    var nodes: [BranchNode] = []
+    var edges: [BranchEdge] = []
+    var queue: [(branchId: String, level: Int)] = [(Branch.main, 0)]
+    var seen: Set<String> = []
+    var levelOrders: [Int: Int] = [:]
+
+    while !queue.isEmpty {
+      let (bid, level) = queue.removeFirst()
+      guard let b = branches[bid], !seen.contains(bid) else { continue }
+      seen.insert(bid)
+
+      let order = levelOrders[level, default: 0]
+      levelOrders[level] = order + 1
+      nodes.append(
+        BranchNode(
+          id: b.id,
+          ref: b.ref,
+          baseVersionId: b.baseVersionId,
+          createdAt: b.createdAt,
+          level: level,
+          order: order
+        ))
+
+      // Enqueue children sorted by createdAt
+      let kids = (children[b.id] ?? []).sorted { $0.createdAt < $1.createdAt }
+      for child in kids {
+        edges.append(BranchEdge(from: b.id, to: child.id))
+        queue.append((child.id, level + 1))
+      }
+    }
+
+    // Add any disconnected branches (defensive, should not happen)
+    for (id, b) in branches where !seen.contains(id) {
+      nodes.append(
+        BranchNode(
+          id: b.id,
+          ref: b.ref,
+          baseVersionId: b.baseVersionId,
+          createdAt: b.createdAt,
+          level: 0,
+          order: levelOrders[0, default: 0]
+        ))
+      levelOrders[0, default: 0] += 1
+      if branches[b.ref] != nil { edges.append(BranchEdge(from: b.ref, to: b.id)) }
+    }
+
+    // Ensure main exists in nodes
+    if nodes.first(where: { $0.id == Branch.main }) == nil {
+      nodes.append(
+        BranchNode(
+          id: Branch.main,
+          ref: Branch.main,
+          baseVersionId: nil,
+          createdAt: Date(),
+          level: 0,
+          order: 0
+        ))
+    }
+
+    return (nodes, edges)
+  }
 }

@@ -6,6 +6,10 @@ struct EditorView: View {
 
   @State private var text = ""
   @State private var timelineState: TimelineViewState = .visible
+  // Editor zoom state (1.0 = normal). Pinch-out reduces this to reveal the graph behind.
+  @State private var editorScale: CGFloat = 1.0
+  @State private var baseScale: CGFloat = 1.0
+  @State private var isGraphVisible: Bool = false
 
   @State private var editorController: EditorController
   @State private var versionStore: VersionStore
@@ -26,24 +30,55 @@ struct EditorView: View {
 
   var body: some View {
     ZStack(alignment: .leading) {
-      ScrollView(.vertical) {
-        ZStack(alignment: .topLeading) {
-          if text.isEmpty {
-            welcomeView
+      // Foreground: editor content scaled with pinch
+      ZStack(alignment: .leading) {
+        ScrollView(.vertical) {
+          ZStack(alignment: .topLeading) {
+            if text.isEmpty {
+              welcomeView
+            }
+            textEditor
           }
-          textEditor
         }
-      }
-      .scrollContentBackground(.hidden)
-      .scrollDismissesKeyboard(.interactively)
+        .scrollContentBackground(.hidden)
+        .scrollDismissesKeyboard(.interactively)
 
-      VersionTimelineView(
-        versionStore: versionStore,
-        onVersionSelected: { version in
-          editorController.restoreVersion(version)
-        },
-        timelineState: $timelineState
-      )
+        VersionTimelineView(
+          versionStore: versionStore,
+          onVersionSelected: { version in
+            editorController.restoreVersion(version)
+          },
+          timelineState: $timelineState
+        )
+        .opacity(editorScale)  // fade out timeline slightly as we zoom out
+      }
+      .scaleEffect(editorScale)
+      .animation(.smooth(duration: 0.2), value: editorScale)
+      .opacity(isGraphVisible ? 0 : 1)
+      .allowsHitTesting(!isGraphVisible)
+
+      // Overlay: Branch graph (only when visible) above editor to ensure interactions
+      if isGraphVisible {
+        BranchGraphView(
+          versionStore: versionStore,
+          onSelectBranch: { name in
+            versionStore.switchBranch(to: name)
+            if let latest = versionStore.currentVersion
+              ?? versionStore.latestVersion(forBranch: name)
+            {
+              editorController.restoreVersion(latest)
+            }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+              editorScale = 1.0
+              baseScale = 1.0
+              isGraphVisible = false
+            }
+          }
+        )
+        .padding(.top, 32)
+        .transition(.opacity.combined(with: .scale))
+        .zIndex(1)
+      }
     }
     .contentShape(Rectangle())
     .gesture(
@@ -62,6 +97,7 @@ struct EditorView: View {
           }
         }
     )
+    .simultaneousGesture(magnificationGesture)
     .background(Color.background.edgesIgnoringSafeArea(.all))
     .toolbar {
       ToolbarItem(placement: .title) {
@@ -93,6 +129,7 @@ struct EditorView: View {
       .padding(.trailing, textPadding)
       .padding(.leading, timelineState == .hidden ? textPadding : timelineState.width + textPadding)
       .animation(.bouncy, value: timelineState)
+      .allowsHitTesting(true)
   }
 
   private var titleView: some View {
@@ -173,5 +210,38 @@ struct EditorView: View {
         Image(systemName: "ellipsis")
       }
     }
+  }
+}
+
+extension EditorView {
+  private var magnificationGesture: some Gesture {
+    MagnificationGesture()
+      .onChanged { scale in
+        // Inverse: pinch-in (scale < 1) reveals graph by shrinking editor
+        let target = (baseScale * scale).clamped(to: 0.6...1.0)
+        editorScale = target
+        // Reveal the graph once we pass a threshold
+        let revealThreshold: CGFloat = 0.92
+        withAnimation(.smooth(duration: 0.15)) {
+          isGraphVisible = target < revealThreshold
+        }
+      }
+      .onEnded { scale in
+        // Snap to either fully open or closed for a clean end state
+        let openThreshold: CGFloat = 0.85
+        if editorScale < openThreshold {
+          withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            editorScale = 0.75
+            isGraphVisible = true
+          }
+          baseScale = editorScale
+        } else {
+          withAnimation(.spring(response: 0.4, dampingFraction: 0.9)) {
+            editorScale = 1.0
+            isGraphVisible = false
+          }
+          baseScale = 1.0
+        }
+      }
   }
 }
