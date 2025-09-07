@@ -6,20 +6,20 @@ struct BranchGraphView: View {
   let currentBranchId: String
   let versionController: VersionController
   let onSelectBranch: (String) -> Void
-  
+
   @State private var scale: CGFloat = 1.0
   @State private var lastScale: CGFloat = 1.0
   @State private var didHapticZoom = false
-  
+
   private let nodeSize = CGSize(width: 180, height: 110)
   private let levelSpacing: CGFloat = 260
   private let rowSpacing: CGFloat = 150
   private let portGap: CGFloat = 10
-  
+
   var body: some View {
     let graph = versionController.branchGraph()
     let positions = computePositions(graph.nodes)
-    
+
     ScrollView([.horizontal, .vertical]) {
       ZStack {
         Canvas { ctx, size in
@@ -33,26 +33,28 @@ struct BranchGraphView: View {
           }
         }
         .allowsHitTesting(false)
-        
+
         ForEach(graph.nodes) { node in
           let pos = positions[node.id] ?? .zero
           let branch = branches.first { $0.id == node.id }
-          let previewAttr = branch != nil ? 
-            versionController.previewAttributedString(for: branch!, withDiff: true) :
-            AttributedString(node.preview)
-          
+          let previewAttr =
+            branch != nil
+            ? versionController.previewAttributedString(for: branch!, withDiff: true)
+            : AttributedString(node.preview)
+
           BranchNodeTile(
             title: node.id == Branch.main ? "Main" : node.name,
             preview: previewAttr,
             isCurrentBranch: node.isCurrentBranch,
             hasAI: node.hasAI,
-            hasSynonym: node.hasSynonym
+            hasSynonym: node.hasSynonym,
+            diffInfo: node.diffInfo
           ) {
             onSelectBranch(node.id)
           }
           .position(pos)
         }
-        
+
         Canvas { ctx, size in
           let strokeColor = Color.successGold.opacity(0.5)
           let arrowLength: CGFloat = 16
@@ -94,34 +96,34 @@ struct BranchGraphView: View {
       .padding(40)
     }
   }
-  
+
   private func computePositions(_ nodes: [VersionController.BranchNode]) -> [String: CGPoint] {
     var levelMap: [String: Int] = [:]
     var childrenMap: [String: [String]] = [:]
-    
+
     for node in nodes {
       if let parentId = node.parentId {
         childrenMap[parentId, default: []].append(node.id)
       }
     }
-    
+
     func assignLevel(_ nodeId: String, level: Int) {
       levelMap[nodeId] = level
       for child in childrenMap[nodeId] ?? [] {
         assignLevel(child, level: level + 1)
       }
     }
-    
+
     if let mainNode = nodes.first(where: { $0.parentId == nil || $0.id == Branch.main }) {
       assignLevel(mainNode.id, level: 0)
     }
-    
+
     var columns: [Int: [String]] = [:]
     for node in nodes {
       let level = levelMap[node.id] ?? 0
       columns[level, default: []].append(node.id)
     }
-    
+
     var positions: [String: CGPoint] = [:]
     for (level, nodeIds) in columns {
       for (idx, nodeId) in nodeIds.enumerated() {
@@ -132,20 +134,20 @@ struct BranchGraphView: View {
     }
     return positions
   }
-  
+
   private func contentSize(for nodes: [VersionController.BranchNode]) -> CGSize {
     var maxLevel = 0
     var rowsPerLevel: [Int: Int] = [:]
-    
+
     var levelMap: [String: Int] = [:]
     var childrenMap: [String: [String]] = [:]
-    
+
     for node in nodes {
       if let parentId = node.parentId {
         childrenMap[parentId, default: []].append(node.id)
       }
     }
-    
+
     func assignLevel(_ nodeId: String, level: Int) {
       levelMap[nodeId] = level
       maxLevel = max(maxLevel, level)
@@ -154,17 +156,17 @@ struct BranchGraphView: View {
         assignLevel(child, level: level + 1)
       }
     }
-    
+
     if let mainNode = nodes.first(where: { $0.parentId == nil || $0.id == Branch.main }) {
       assignLevel(mainNode.id, level: 0)
     }
-    
+
     let maxRows = rowsPerLevel.values.max() ?? 1
     let width = CGFloat(maxLevel + 1) * levelSpacing + nodeSize.width
     let height = CGFloat(maxRows) * rowSpacing + nodeSize.height
     return CGSize(width: width, height: height)
   }
-  
+
   private func edgePath(from: CGPoint, to: CGPoint, shorten: CGFloat = 0) -> Path {
     var p = Path()
     let start = CGPoint(x: from.x + nodeSize.width / 2 + portGap, y: from.y)
@@ -186,17 +188,18 @@ private struct BranchNodeTile: View {
   let isCurrentBranch: Bool
   let hasAI: Bool
   let hasSynonym: Bool
+  let diffInfo: TextDiffManager.DiffInfo?
   let onTap: () -> Void
-  
+
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: 6) {
       HStack {
         Text(title)
           .font(.inter(size: 10, relativeTo: .caption))
           .foregroundStyle(isCurrentBranch ? .textPrimary : .textSecondary)
-        
+
         Spacer()
-        
+
         if hasAI {
           Image(systemName: "sparkles")
             .font(.system(size: 8))
@@ -208,22 +211,37 @@ private struct BranchNodeTile: View {
             .foregroundColor(.aiPurple)
         }
       }
-      
+
+      // Show diff summary if available
+      if let diffInfo = diffInfo, diffInfo.hasDifferences {
+        HStack(spacing: 4) {
+          if diffInfo.addedWords > 0 {
+            Text("+\(diffInfo.addedWords)")
+              .font(.system(size: 9, weight: .medium, design: .monospaced))
+              .foregroundColor(.green)
+          }
+          if diffInfo.removedWords > 0 {
+            Text("-\(diffInfo.removedWords)")
+              .font(.system(size: 9, weight: .medium, design: .monospaced))
+              .foregroundColor(.red)
+          }
+          Text("words")
+            .font(.system(size: 9))
+            .foregroundColor(.secondary)
+        }
+      }
+
       Text(preview)
         .font(.literata(size: 12, relativeTo: .body))
         .foregroundStyle(.textPrimary)
-        .lineLimit(5)
+        .lineLimit(4)
         .multilineTextAlignment(.leading)
     }
     .frame(width: 180, height: 110, alignment: .topLeading)
     .padding(12)
     .glassEffect(
-      .regular,
+      .regular.tint(isCurrentBranch ? .successGold.opacity(0.1) : .clear).interactive(),
       in: .rect(cornerRadius: 12)
-    )
-    .border(
-      isCurrentBranch ? Color.successGold.opacity(0.5) : Color.clear,
-      width: 2
     )
     .contentShape(Rectangle())
     .onTapGesture {

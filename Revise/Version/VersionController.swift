@@ -238,6 +238,55 @@ final class VersionController {
     // Show the end of the document with ellipsis at the beginning
     return "..." + String(text.suffix(maxLength))
   }
+  
+  func previewTextSmartly(for branch: Branch, withDiffInfo diffInfo: TextDiffManager.DiffInfo?, maxLength: Int = 50) -> String {
+    let text = latestVersion(for: branch)?.text ?? ""
+    
+    // If text fits, show all
+    if text.count <= maxLength {
+      return text
+    }
+    
+    // If there's a diff, try to show the changed region
+    if let diffInfo = diffInfo,
+       let firstRange = diffInfo.ranges.first {
+      
+      // Calculate context around the change
+      let contextBefore = 15
+      let contextAfter = maxLength - contextBefore - 10 // Leave room for change
+      
+      let changeStart = firstRange.location
+      let changeEnd = firstRange.location + firstRange.length
+      
+      // Determine preview window
+      let previewStart = max(0, changeStart - contextBefore)
+      let previewEnd = min(text.count, changeEnd + contextAfter)
+      
+      // Extract preview
+      let startIdx = text.index(text.startIndex, offsetBy: previewStart)
+      let endIdx = text.index(text.startIndex, offsetBy: min(previewEnd, text.count))
+      
+      var preview = String(text[startIdx..<endIdx])
+      
+      // Add ellipsis if needed
+      if previewStart > 0 {
+        preview = "..." + preview
+      }
+      if previewEnd < text.count && preview.count < maxLength {
+        preview = preview + "..."
+      }
+      
+      // Truncate if still too long
+      if preview.count > maxLength + 6 { // Allow for ellipsis
+        preview = String(preview.prefix(maxLength)) + "..."
+      }
+      
+      return preview
+    }
+    
+    // Default: show the end
+    return "..." + String(text.suffix(maxLength))
+  }
 
   func previewAttributedString(for branch: Branch, withDiff: Bool = false) -> AttributedString {
     let preview = previewText(for: branch)
@@ -271,6 +320,10 @@ final class VersionController {
             let endIdx = preview.index(preview.startIndex, offsetBy: diffEndInPreview)
             if let attrRange = attributed.range(of: preview[startIdx..<endIdx]) {
               attributed[attrRange].backgroundColor = Color.aiPurple.opacity(0.2)
+              attributed[attrRange].underlineStyle = Text.LineStyle(
+                pattern: .solid,
+                color: Color.successGold.opacity(0.5)
+              )
             }
           }
         }
@@ -282,6 +335,10 @@ final class VersionController {
             diffStart, offsetBy: min(diffRange.length, preview.count - diffRange.location))
           if let attrRange = attributed.range(of: preview[diffStart..<diffEnd]) {
             attributed[attrRange].backgroundColor = Color.aiPurple.opacity(0.2)
+            attributed[attrRange].underlineStyle = Text.LineStyle(
+              pattern: .solid,
+              color: Color.successGold.opacity(0.5)
+            )
           }
         }
       }
@@ -302,6 +359,7 @@ final class VersionController {
     let hasAI: Bool
     let hasSynonym: Bool
     let diffRange: NSRange?  // Range of text that differs from parent branch
+    let diffInfo: TextDiffManager.DiffInfo?  // Detailed diff information
   }
 
   struct BranchEdge: Identifiable {
@@ -320,11 +378,16 @@ final class VersionController {
 
       // Compute diff from parent branch
       var diffRange: NSRange? = nil
+      var diffInfo: TextDiffManager.DiffInfo? = nil
       if let parentBranch = branch.parent,
         let branchText = latestVersion(for: branch)?.text,
         let parentText = latestVersion(for: parentBranch)?.text
       {
         diffRange = TextDiffManager.findChangedRange(
+          oldText: parentText,
+          newText: branchText
+        )
+        diffInfo = TextDiffManager.computeDiffInfo(
           oldText: parentText,
           newText: branchText
         )
@@ -334,11 +397,12 @@ final class VersionController {
         id: branch.id,
         name: branch.name,
         parentId: branch.parent?.id,
-        preview: previewText(for: branch),
+        preview: previewTextSmartly(for: branch, withDiffInfo: diffInfo),
         isCurrentBranch: branch.id == document.currentBranch?.id,
         hasAI: hasAI,
         hasSynonym: hasSynonym,
-        diffRange: diffRange
+        diffRange: diffRange,
+        diffInfo: diffInfo
       )
       nodes.append(node)
 

@@ -1,6 +1,17 @@
 import Foundation
 
 struct TextDiffManager {
+  struct DiffInfo {
+    let ranges: [NSRange]
+    let addedWords: Int
+    let removedWords: Int
+    let totalChangedChars: Int
+    
+    var hasDifferences: Bool {
+      !ranges.isEmpty || addedWords != 0 || removedWords != 0
+    }
+  }
+  
   static func findChangedRange(oldText: String, newText: String) -> NSRange? {
     // Simple diff: find first difference and last difference
     let old = Array(oldText)
@@ -40,6 +51,31 @@ struct TextDiffManager {
     }
 
     return NSRange(location: firstDiff, length: lastDiffNew - firstDiff)
+  }
+  
+  static func findAllChangedRanges(oldText: String, newText: String) -> [NSRange] {
+    // For now, return single range - can be enhanced with proper diff algorithm later
+    if let range = findChangedRange(oldText: oldText, newText: newText) {
+      return [range]
+    }
+    return []
+  }
+  
+  static func computeDiffInfo(oldText: String, newText: String) -> DiffInfo {
+    let ranges = findAllChangedRanges(oldText: oldText, newText: newText)
+    let oldWordCount = calculateWordCount(for: oldText)
+    let newWordCount = calculateWordCount(for: newText)
+    
+    let addedWords = max(0, newWordCount - oldWordCount)
+    let removedWords = max(0, oldWordCount - newWordCount)
+    let totalChangedChars = ranges.reduce(0) { $0 + $1.length }
+    
+    return DiffInfo(
+      ranges: ranges,
+      addedWords: addedWords,
+      removedWords: removedWords,
+      totalChangedChars: totalChangedChars
+    )
   }
 
   static func calculateWordCount(for text: String) -> Int {

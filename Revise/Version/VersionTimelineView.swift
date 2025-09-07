@@ -2,7 +2,7 @@ import SwiftUI
 
 enum TimelineViewState {
   case hidden, visible, expanded
-  
+
   var width: CGFloat {
     switch self {
     case .hidden, .visible:
@@ -11,7 +11,7 @@ enum TimelineViewState {
       return 100
     }
   }
-  
+
   func toggle() -> TimelineViewState {
     switch self {
     case .hidden:
@@ -28,12 +28,12 @@ struct VersionTimelineView: View {
   let versions: [Version]
   let currentIndex: Int
   let onVersionSelected: (Version) -> Void
-  
+
   @State private var hoveredIndex: Int?
   @State private var isDragging = false
-  
+
   @Binding var timelineState: TimelineViewState
-  
+
   var body: some View {
     GeometryReader { geometry in
       ZStack(alignment: .trailing) {
@@ -54,7 +54,7 @@ struct VersionTimelineView: View {
             hoveredIndex = isHovered ? index : nil
           }
         }
-        
+
         Color.clear
           .contentShape(Rectangle())
           .gesture(
@@ -85,14 +85,14 @@ struct VersionTimelineView: View {
       .animation(.bouncy, value: timelineState)
     }
   }
-  
+
   private func nodePosition(for index: Int, in height: CGFloat) -> CGFloat {
     guard !versions.isEmpty else { return 0 }
     let usableHeight = height - 60
     let step = usableHeight / max(1, CGFloat(versions.count - 1))
     return 20 + (CGFloat(index) * step)
   }
-  
+
   private func indexForPosition(_ position: CGFloat, in height: CGFloat) -> Int {
     guard !versions.isEmpty else { return 0 }
     let usableHeight = height - 60
@@ -107,9 +107,9 @@ struct VersionNode: View {
   let isActive: Bool
   let isHovered: Bool
   let position: CGFloat
-  
+
   @Binding var timelineState: TimelineViewState
-  
+
   var nodeColor: Color {
     switch version.changeType {
     case .synonym:
@@ -120,11 +120,11 @@ struct VersionNode: View {
       return Color.gray
     }
   }
-  
+
   var nodeSize: CGFloat {
     if isActive { return 12 }
     if isHovered { return 10 }
-    
+
     switch version.changeType {
     case .synonym, .ai:
       return 8
@@ -132,7 +132,7 @@ struct VersionNode: View {
       return 6
     }
   }
-  
+
   var body: some View {
     ZStack {
       Circle()
@@ -141,9 +141,11 @@ struct VersionNode: View {
         .shadow(color: Color.successGold.opacity(0.5), radius: isActive ? 2 : 0, x: 0, y: 0)
         .scaleEffect(isActive ? 1.2 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isActive)
-        .position(x: timelineState.width / 2, y: position)
-      
-      if timelineState == .expanded && isHovered {
+        .position(
+          x: timelineState == .expanded ? timelineState.width / 4 : timelineState.width / 2,
+          y: position)
+
+      if timelineState == .expanded {
         VStack(alignment: .leading, spacing: 2) {
           Text(version.timestamp, style: .time)
             .font(.inter(size: 10, relativeTo: .caption2))
@@ -153,7 +155,7 @@ struct VersionNode: View {
         .foregroundColor(.textSecondary)
         .padding(.horizontal, 4)
         .transition(.asymmetric(insertion: .opacity, removal: .identity))
-        .position(x: timelineState.width + 40, y: position)
+        .position(x: timelineState.width / 2 + 8, y: position)
       }
     }
   }
