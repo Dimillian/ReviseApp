@@ -5,15 +5,16 @@ import SwiftUI
 @Observable
 final class VersionController {
   let document: Document
-  private let modelContext: ModelContext
+  var modelContext: ModelContext?
 
   private let maxVersions = 100
   private let coalescingInterval: TimeInterval = 2.0
   private var lastEditTime: Date?
 
-  init(document: Document, modelContext: ModelContext) {
+  var shouldUpdateEditor: Bool = false
+
+  init(document: Document) {
     self.document = document
-    self.modelContext = modelContext
   }
 
   var currentBranch: Branch? {
@@ -25,7 +26,7 @@ final class VersionController {
   }
 
   var versions: [Version] {
-    currentBranch?.versions.sorted { $0.timestamp < $1.timestamp } ?? []
+    currentBranch?.versions ?? []
   }
 
   var currentIndex: Int {
@@ -77,7 +78,7 @@ final class VersionController {
           lastVersion.highlightedLocation = highlightedRange.location
           lastVersion.highlightedLength = highlightedRange.length
         }
-        
+
       }
     } else {
       lastEditTime = Date()
@@ -90,7 +91,7 @@ final class VersionController {
         for version in toRemove {
           if let idx = branch.versions.firstIndex(where: { $0.id == version.id }) {
             branch.versions.remove(at: idx)
-            modelContext.delete(version)
+            modelContext?.delete(version)
           }
         }
       }
@@ -109,14 +110,14 @@ final class VersionController {
       if branch.versions.count > maxVersions {
         if let firstVersion = branch.versions.first {
           branch.versions.removeFirst()
-          modelContext.delete(firstVersion)
+          modelContext?.delete(firstVersion)
         }
       }
     }
 
     document.lastEdited = Date()
 
-    try? modelContext.save()
+    try? modelContext?.save()
   }
 
   func undo() -> Version? {
@@ -126,7 +127,7 @@ final class VersionController {
 
     let targetVersion = versionList[currentIndex - 1]
     currentBranch?.currentVersion = targetVersion
-    try? modelContext.save()
+    try? modelContext?.save()
     return targetVersion
   }
 
@@ -137,24 +138,24 @@ final class VersionController {
 
     let targetVersion = versionList[currentIndex + 1]
     currentBranch?.currentVersion = targetVersion
-    try? modelContext.save()
+    try? modelContext?.save()
     return targetVersion
   }
 
-  func navigateToVersion(at index: Int) -> Version? {
+  func navigateToVersion(at index: Int, shouldUpdateEditor: Bool = false) -> Version? {
     let versionList = versions
     guard index >= 0 && index < versionList.count else { return nil }
 
     let targetVersion = versionList[index]
+    self.shouldUpdateEditor = shouldUpdateEditor
     currentBranch?.currentVersion = targetVersion
-    try? modelContext.save()
     return targetVersion
   }
 
-  func navigateToVersion(_ version: Version) -> Version? {
+  func navigateToVersion(_ version: Version, shouldUpdateEditor: Bool = false) -> Version? {
     guard version.branch.id == currentBranch?.id else { return nil }
+    self.shouldUpdateEditor = shouldUpdateEditor
     currentBranch?.currentVersion = version
-    try? modelContext.save()
     return version
   }
 
@@ -187,14 +188,14 @@ final class VersionController {
     document.branches.append(newBranch)
     document.currentBranch = newBranch
 
-    try? modelContext.save()
+    try? modelContext?.save()
     return newBranch
   }
 
   func switchToBranch(named name: String) {
     guard let branch = document.branches.first(where: { $0.id == name }) else { return }
     document.currentBranch = branch
-    try? modelContext.save()
+    try? modelContext?.save()
   }
 
   func deleteBranch(named name: String) {
@@ -209,9 +210,9 @@ final class VersionController {
     if let index = document.branches.firstIndex(where: { $0.id == name }) {
       document.branches.remove(at: index)
     }
-    modelContext.delete(branch)
+    modelContext?.delete(branch)
 
-    try? modelContext.save()
+    try? modelContext?.save()
   }
 
   func renameBranch(from oldName: String, to newName: String) {
@@ -223,7 +224,7 @@ final class VersionController {
     else { return }
 
     branch.id = trimmed
-    try? modelContext.save()
+    try? modelContext?.save()
   }
 
   func latestVersion(for branch: Branch) -> Version? {
@@ -238,36 +239,39 @@ final class VersionController {
     // Show the end of the document with ellipsis at the beginning
     return "..." + String(text.suffix(maxLength))
   }
-  
-  func previewTextSmartly(for branch: Branch, withDiffInfo diffInfo: TextDiffManager.DiffInfo?, maxLength: Int = 50) -> String {
+
+  func previewTextSmartly(
+    for branch: Branch, withDiffInfo diffInfo: TextDiffManager.DiffInfo?, maxLength: Int = 50
+  ) -> String {
     let text = latestVersion(for: branch)?.text ?? ""
-    
+
     // If text fits, show all
     if text.count <= maxLength {
       return text
     }
-    
+
     // If there's a diff, try to show the changed region
     if let diffInfo = diffInfo,
-       let firstRange = diffInfo.ranges.first {
-      
+      let firstRange = diffInfo.ranges.first
+    {
+
       // Calculate context around the change
       let contextBefore = 15
-      let contextAfter = maxLength - contextBefore - 10 // Leave room for change
-      
+      let contextAfter = maxLength - contextBefore - 10  // Leave room for change
+
       let changeStart = firstRange.location
       let changeEnd = firstRange.location + firstRange.length
-      
+
       // Determine preview window
       let previewStart = max(0, changeStart - contextBefore)
       let previewEnd = min(text.count, changeEnd + contextAfter)
-      
+
       // Extract preview
       let startIdx = text.index(text.startIndex, offsetBy: previewStart)
       let endIdx = text.index(text.startIndex, offsetBy: min(previewEnd, text.count))
-      
+
       var preview = String(text[startIdx..<endIdx])
-      
+
       // Add ellipsis if needed
       if previewStart > 0 {
         preview = "..." + preview
@@ -275,15 +279,15 @@ final class VersionController {
       if previewEnd < text.count && preview.count < maxLength {
         preview = preview + "..."
       }
-      
+
       // Truncate if still too long
-      if preview.count > maxLength + 6 { // Allow for ellipsis
+      if preview.count > maxLength + 6 {  // Allow for ellipsis
         preview = String(preview.prefix(maxLength)) + "..."
       }
-      
+
       return preview
     }
-    
+
     // Default: show the end
     return "..." + String(text.suffix(maxLength))
   }

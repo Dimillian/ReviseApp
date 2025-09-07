@@ -2,9 +2,9 @@ import Foundation
 import SwiftData
 
 @Model
-final class Branch {
+final class Branch: Identifiable {
   static let main = "main"
-  
+
   @Attribute(.unique)
   var id: String
 

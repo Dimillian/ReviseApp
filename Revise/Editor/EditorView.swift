@@ -17,7 +17,7 @@ struct EditorView: View {
   @State private var didHapticReveal: Bool = false
 
   @State private var editorController = EditorController()
-  @State private var versionController: VersionController?
+  @State private var versionController: VersionController
   @State private var isFirstLaunch = true
 
   @State private var isMenuLoading = false
@@ -29,6 +29,9 @@ struct EditorView: View {
 
     let documentId = document.id
     let currentBranchId = document.currentBranch?.id ?? Branch.main
+
+    let controller = VersionController(document: document)
+    versionController = controller
 
     _versions = Query(
       filter: #Predicate<Version> { version in
@@ -61,15 +64,15 @@ struct EditorView: View {
         .scrollDismissesKeyboard(.interactively)
 
         VersionTimelineView(
-          versions: versions,
-          currentIndex: versionController?.currentIndex ?? -1,
-          onVersionSelected: { version in
-            if let restoredVersion = versionController?.navigateToVersion(version) {
-              editorController.restoreVersion(restoredVersion)
-            }
-          },
+          versionController: versionController,
           timelineState: $timelineState
         )
+        .onChange(of: versionController.currentVersion) { _, version in
+          if let version, versionController.shouldUpdateEditor {
+            editorController.restoreVersion(version)
+            versionController.shouldUpdateEditor = false
+          }
+        }
         .opacity(editorScale)
       }
       .scaleEffect(editorScale)
@@ -77,15 +80,15 @@ struct EditorView: View {
       .opacity(isGraphVisible ? 0 : 1)
       .allowsHitTesting(!isGraphVisible)
 
-      if isGraphVisible, let controller = versionController {
+      if isGraphVisible {
         BranchGraphView(
           branches: branches,
           currentBranchId: document.currentBranch?.id ?? Branch.main,
-          versionController: controller,
+          versionController: versionController,
           onSelectBranch: { branchId in
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            controller.switchToBranch(named: branchId)
-            if let latest = controller.currentVersion {
+            versionController.switchToBranch(named: branchId)
+            if let latest = versionController.currentVersion {
               editorController.restoreVersion(latest)
             }
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -132,14 +135,13 @@ struct EditorView: View {
     }
     .scrollEdgeEffectStyle(.soft, for: .top)
     .onChange(of: text) {
-      if !text.isEmpty {
+      if !text.isEmpty && isFirstLaunch {
         isFirstLaunch = false
       }
     }
     .onAppear {
-      let controller = VersionController(document: document, modelContext: modelContext)
-      versionController = controller
-      editorController.versionController = controller
+      versionController.modelContext = modelContext
+      editorController.versionController = versionController
       if let latestVersion = versions.last {
         editorController.restoreVersion(latestVersion)
         isFirstLaunch = false

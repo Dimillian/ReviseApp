@@ -25,53 +25,18 @@ enum TimelineViewState {
 }
 
 struct VersionTimelineView: View {
-  let versions: [Version]
-  let currentIndex: Int
-  let onVersionSelected: (Version) -> Void
+  let versionController: VersionController
+  @Binding var timelineState: TimelineViewState
 
   @State private var hoveredIndex: Int?
   @State private var isDragging = false
 
-  @Binding var timelineState: TimelineViewState
-
   var body: some View {
+    let _ = Self._printChanges()
     GeometryReader { geometry in
       ZStack(alignment: .trailing) {
-        ForEach(Array(versions.enumerated()), id: \.element.id) { index, version in
-          VersionNode(
-            version: version,
-            isActive: index == currentIndex,
-            isHovered: hoveredIndex == index,
-            position: nodePosition(for: index, in: geometry.size.height),
-            timelineState: $timelineState
-          )
-          .onTapGesture {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-              onVersionSelected(version)
-            }
-          }
-          .onHover { isHovered in
-            hoveredIndex = isHovered ? index : nil
-          }
-        }
-
-        Color.clear
-          .contentShape(Rectangle())
-          .gesture(
-            DragGesture(minimumDistance: 0)
-              .onChanged { value in
-                isDragging = true
-                let index = indexForPosition(value.location.y, in: geometry.size.height)
-                if index != currentIndex && index < versions.count {
-                  let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                  impactFeedback.impactOccurred()
-                  onVersionSelected(versions[index])
-                }
-              }
-              .onEnded { _ in
-                isDragging = false
-              }
-          )
+        makeNodesView(for: geometry)
+        makeDragGestureView(for: geometry)
       }
       .glassEffect(
         .regular.tint(Color.surface).interactive(),
@@ -86,19 +51,60 @@ struct VersionTimelineView: View {
     }
   }
 
+  private func makeNodesView(for geometry: GeometryProxy) -> some View {
+    ForEach(Array(versionController.versions.enumerated()), id: \.element.id) { index, version in
+      VersionNode(
+        version: version,
+        isActive: index == versionController.currentIndex,
+        isHovered: hoveredIndex == index,
+        position: nodePosition(for: index, in: geometry.size.height),
+        timelineState: $timelineState
+      )
+      .onTapGesture {
+        _ = versionController.navigateToVersion(version, shouldUpdateEditor: true)
+      }
+      .onHover { isHovered in
+        hoveredIndex = isHovered ? index : nil
+      }
+    }
+  }
+
+  private func makeDragGestureView(for geometry: GeometryProxy) -> some View {
+    Color.clear
+      .contentShape(Rectangle())
+      .gesture(
+        DragGesture(minimumDistance: 0)
+          .onChanged { value in
+            isDragging = true
+            let index = indexForPosition(value.location.y, in: geometry.size.height)
+            if index != versionController.currentIndex
+              && index < versionController.versions.count
+            {
+              let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+              impactFeedback.impactOccurred()
+              _ = versionController.navigateToVersion(
+                versionController.versions[index], shouldUpdateEditor: true)
+            }
+          }
+          .onEnded { _ in
+            isDragging = false
+          }
+      )
+  }
+
   private func nodePosition(for index: Int, in height: CGFloat) -> CGFloat {
-    guard !versions.isEmpty else { return 0 }
+    guard !versionController.versions.isEmpty else { return 0 }
     let usableHeight = height - 60
-    let step = usableHeight / max(1, CGFloat(versions.count - 1))
+    let step = usableHeight / max(1, CGFloat(versionController.versions.count - 1))
     return 20 + (CGFloat(index) * step)
   }
 
   private func indexForPosition(_ position: CGFloat, in height: CGFloat) -> Int {
-    guard !versions.isEmpty else { return 0 }
+    guard !versionController.versions.isEmpty else { return 0 }
     let usableHeight = height - 60
-    let step = usableHeight / max(1, CGFloat(versions.count - 1))
+    let step = usableHeight / max(1, CGFloat(versionController.versions.count - 1))
     let index = Int((position - 20) / step)
-    return max(0, min(versions.count - 1, index))
+    return max(0, min(versionController.versions.count - 1, index))
   }
 }
 

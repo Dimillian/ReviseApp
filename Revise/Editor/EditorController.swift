@@ -58,7 +58,6 @@ final class EditorController: NSObject {
     guard let tv = textView else { return }
     isRestoringVersion = true
 
-    // Set text with default attributes
     let attributedText = NSMutableAttributedString(string: version.text)
     let fullRange = NSRange(location: 0, length: attributedText.length)
     highlightManager.setDefaultAttributes(
@@ -71,7 +70,6 @@ final class EditorController: NSObject {
         .foregroundColor: UIColor(Color.textPrimary),
       ], range: fullRange)
     tv.attributedText = attributedText
-
     wordsCount = version.wordCount
 
     // Restore cursor position if available
@@ -89,11 +87,10 @@ final class EditorController: NSObject {
         changeType: version.changeType
       )
     }
-    
     // Reset typing attributes to default to prevent gray text when typing
     tv.typingAttributes = [
       .font: tv.font ?? UIFont.systemFont(ofSize: 17),
-      .foregroundColor: UIColor(Color.textPrimary)
+      .foregroundColor: UIColor(Color.textPrimary),
     ]
 
     isRestoringVersion = false
