@@ -212,13 +212,13 @@ struct EditorView: View {
         }
       }
       Menu {
-        ForEach(branches, id: \.id) { branch in
-          Button(branch.id, systemImage: "branch") {
+        ForEach(branches) { branch in
+          Button(branch.name, systemImage: "arrow.trianglehead.branch") {
             editorController.switchBranch(to: branch.id)
           }
         }
       } label: {
-        Label("Branches", systemImage: "branch")
+        Label("Branches", systemImage: "arrow.trianglehead.branch")
       }
       Button("Undo", systemImage: "arrow.uturn.left") {
         editorController.undo()

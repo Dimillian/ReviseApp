@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Version {
+final class Version: Identifiable {
   @Attribute(.unique) var id: String
   var timestamp: Date
   var text: String

@@ -34,6 +34,7 @@ struct Thesaurus {
     let prompt: String = """
       Input word: \(word)
       Context sentence: \(sentenceContext ?? "none")
+      Return synonyms that could fit for a replacement in the context.
       Return only synonyms as specified by the schema.
       """
 
