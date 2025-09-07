@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Revise is a premium iOS writing app focused on short-form text perfection through non-destructive editing and AI-powered variations. This is a SwiftUI-first application targeting iOS 18+ with the latest APIs.
+Revise is a premium iOS writing app focused on short-form text perfection through non-destructive editing and AI-powered variations. This is a SwiftUI-first application targeting iOS 26+ with the latest APIs.
 
 ## Architecture Principles
 
@@ -11,6 +11,12 @@ Revise is a premium iOS writing app focused on short-form text perfection throug
 - Inject shared state via SwiftUI environment
 - Keep business logic in Observable classes
 - Views can directly own their state when not shared
+
+### Data Persistence with SwiftData
+- Uses SwiftData (iOS 17+) for all data persistence
+- No manual JSON encoding/decoding or file management
+- Core Data models: Document, Branch, Version
+- Relationships are managed automatically by SwiftData
 
 ### Core Components
 
@@ -22,16 +28,22 @@ Revise is a premium iOS writing app focused on short-form text perfection throug
 
 2. **Version Timeline**: 
    - Vertical axis for chronological edits
-   - Auto-save on every edit
-   - Commit points: minor (pause), major (paragraph), tagged (export)
-   - Two-finger swipe navigation
-   - Visual scrubber on right edge
+   - Auto-save on every edit with coalescing (2 second window)
+   - Visual timeline with centered dots in glass-effect capsule
+   - Drag gesture for scrubbing through versions
+   - Shows word count and timestamp on hover (expanded mode)
 
 3. **Branch System**:
    - Horizontal axis for alternative versions
    - Created via: explicit branch, AI variations, or major rewrites
-   - Swipe left/right to switch branches
-   - Visual tree with node types (edit, AI, starred)
+   - Pinch gesture reveals branch graph visualization
+   - Visual tree with node tiles showing preview text
+   - Branch graph shows parent-child relationships with curved edges
+
+4. **Data Models (SwiftData)**:
+   - **Document**: Has unique id, title, lastEdited, currentBranch, and branches[]
+   - **Branch**: Has unique id, belongs to Document (non-optional), has parent Branch (optional), versions[], and currentVersion
+   - **Version**: Has unique id, belongs to Branch (non-optional), stores text, changeKind, word/character counts, cursor position, and selection ranges
 
 
 ## Key Implementation Details
@@ -43,10 +55,11 @@ Revise is a premium iOS writing app focused on short-form text perfection throug
 - Auto-detect content type (poetry/prose/code)
 
 ### Version Control
-- Every edit triggers auto-save
-- Use differential storage for efficiency
-- Implement smart commit grouping (rapid typo fixes vs deliberate edits)
-- Support branching for exploring alternatives
+- Every edit triggers auto-save via VersionController
+- Coalescing: rapid edits within 2 seconds update the same version
+- Maximum 100 versions per branch (oldest removed when exceeded)
+- VersionController manages all version operations (add, undo, redo, navigate)
+- Branch creation copies current version as seed for new branch
 
 ### Gesture Navigation
 - Vertical swipe: timeline navigation
@@ -69,12 +82,36 @@ Revise is a premium iOS writing app focused on short-form text perfection throug
 - Validate AI response handling
 - Performance testing with large documents
 
+## Important Architectural Details
+
+### SwiftData Implementation
+- **ModelContainer**: Configured in ReviseApp with all three models
+- **@Query**: Used in views for reactive data fetching with predicates
+- **ModelContext**: Accessed via @Environment for data mutations
+- **Relationships**: Properly configured with inverse relationships and cascade delete rules
+- **Non-optional relationships**: Branch must have Document, Version must have Branch
+
+### Key Controllers
+- **VersionController**: Manages all version operations, replaces old VersionStore
+  - Handles version coalescing, undo/redo, branch operations
+  - Integrates with ModelContext for persistence
+- **EditorController**: Manages text editor state and interactions
+  - Handles synonym selection, text restoration, haptic feedback
+  - Communicates with VersionController for version management
+
+### UI State Management
+- Timeline state (hidden/visible/expanded) managed locally in EditorView
+- Branch graph visibility controlled by pinch gesture
+- Editor scale for zoom effect during branch visualization
+- All UI state uses @State, business logic in @Observable controllers
+
 ## Important Notes
 
-1. **iOS 26 APIs**: Use latest TextKit 2 and SwiftUI features
-3. **Memory**: Implement smart caching for version history
+1. **iOS 26+ Only**: Uses latest TextKit 2, SwiftUI, and SwiftData features
+2. **No Legacy Storage**: All data persistence through SwiftData, no JSON files
+3. **Memory**: SwiftData handles caching, max 100 versions per branch
 4. **Accessibility**: Full VoiceOver support required
-5. **Typography**: Variable fonts responsive to context
+5. **Typography**: Literata for content, Inter for UI, with dynamic sizing
 
 
 ## Typography & Fonts
@@ -117,10 +154,11 @@ Text("UI Label").interFont(.caption)
 - Xcode project: `Revise.xcodeproj` (scheme: `Revise`). See `CLAUDE.md` for architecture details.
 
 ## Build, Test, and Development Commands
-- Open in Xcode: `xed .` or `open Revise.xcodeproj`.
-- Build (Debug): `xcodebuild -scheme Revise -configuration Debug -destination 'generic/platform=iOS' build`.
-- Run tests (unit+UI): `xcodebuild -scheme Revise -destination 'platform=iOS Simulator,name=iPhone 16 Pro' test`.
-- Clean build artifacts: `xcodebuild -scheme Revise clean`.
+- **Use XcodeBuildMCP for building**: Always use the MCP tools for building and validation
+- **Build validation**: Use `mcp__XcodeBuildMCP__build_sim` to verify code compiles without errors
+- **Never launch the app**: Only build to validate - let the user launch and test the app
+- Clean build artifacts: Use `mcp__XcodeBuildMCP__clean` when needed
+- Discover project structure: Use `mcp__XcodeBuildMCP__discover_projs`
 
 ## Coding Style & Naming Conventions
 - Swift with 2-space indentation; keep lines focused; no trailing whitespace.
@@ -139,9 +177,12 @@ Text("UI Label").interFont(.caption)
 - Ensure builds and tests pass before requesting review.
 
 ## Architecture Notes
-- Target iOS 26; SwiftUI + TextKit 2.
-- Core components: MagneticTextView, Version Timeline, Branch System. Each edit auto-saves; AI variations create branches.
-- Read `README.md` and `CLAUDE.md` before touching editor, versioning, or gesture code.
+- **Target iOS 26+**: SwiftUI + TextKit 2 + SwiftData
+- **Core components**: MagneticTextView, Version Timeline, Branch System
+- **Data flow**: SwiftData models → @Query in views → VersionController for mutations → auto-save
+- **No manual file I/O**: All persistence via SwiftData ModelContainer
+- **Branch creation**: Explicit user action, AI variations, or major rewrites
+- Read `README.md` and `CLAUDE.md` before touching editor, versioning, or gesture code
 
 ## Security & Configuration Tips
 - Do not commit secrets or tokens. Keep third-party assets/fonts licensed and in `Revise/Fonts/`.

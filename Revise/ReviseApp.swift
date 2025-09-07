@@ -1,20 +1,19 @@
 import SwiftUI
+import SwiftData
 
 @main
 struct ReviseApp: App {
-  @State private var documentStore = DocumentStore()
-
   @State private var path: NavigationPath = NavigationPath()
-
+  
   var body: some Scene {
     WindowGroup {
       NavigationStack(path: $path) {
         DocumentsListView(path: $path)
           .navigationDestination(for: Document.self) { document in
-            EditorView(document: document, documentStore: documentStore)
+            EditorView(document: document)
           }
       }
-      .environment(documentStore)
     }
+    .modelContainer(for: [Document.self, Branch.self, Version.self])
   }
 }

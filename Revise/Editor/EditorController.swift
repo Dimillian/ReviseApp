@@ -6,7 +6,7 @@ import UIKit
 final class EditorController: NSObject {
   public var wordsCount: Int = 0
 
-  private let versionStore: VersionStore
+  var versionController: VersionController?
   private let highlightManager = HighlightManager()
   private let synonymManager = SynonymManager()
   private let thesaurus = Thesaurus()
@@ -23,8 +23,8 @@ final class EditorController: NSObject {
   private var isApplyingSynonym = false
   private var versionDebounceTask: Task<Void, Never>?
 
-  init(versionStore: VersionStore) {
-    self.versionStore = versionStore
+  init(versionController: VersionController? = nil) {
+    self.versionController = versionController
     super.init()
     synonymManager.delegate = self
   }
@@ -72,17 +72,17 @@ final class EditorController: NSObject {
       ], range: fullRange)
     tv.attributedText = attributedText
 
-    wordsCount = version.metadata.wordCount
+    wordsCount = version.wordCount
 
     // Restore cursor position if available
-    if let cursorPos = version.metadata.cursorPosition,
+    if let cursorPos = version.cursorPosition,
       let position = tv.position(from: tv.beginningOfDocument, offset: cursorPos)
     {
       tv.selectedTextRange = tv.textRange(from: position, to: position)
     }
 
     // Apply highlight if this version has highlighted changes
-    if let highlightedRange = version.metadata.highlightedRange {
+    if let highlightedRange = version.highlightedRange {
       highlightManager.applyHighlight(
         at: highlightedRange,
         in: tv,
@@ -94,13 +94,13 @@ final class EditorController: NSObject {
   }
 
   func undo() {
-    if let version = versionStore.undo() {
+    if let version = versionController?.undo() {
       restoreVersion(version)
     }
   }
 
   func redo() {
-    if let version = versionStore.redo() {
+    if let version = versionController?.redo() {
       restoreVersion(version)
     }
   }
@@ -108,14 +108,14 @@ final class EditorController: NSObject {
   func createNewBranch() async {
     let title = try? await thesaurus.branchTitle()
     if let title {
-      versionStore.createBranch(named: title)
-      versionStore.switchBranch(to: title)
+      versionController?.createBranch(named: title)
+      versionController?.switchToBranch(named: title)
     }
   }
 
   func switchBranch(to branch: String) {
-    versionStore.switchBranch(to: branch)
-    if let version = versionStore.currentVersion {
+    versionController?.switchToBranch(named: branch)
+    if let version = versionController?.currentVersion {
       restoreVersion(version)
     }
   }
@@ -156,7 +156,7 @@ final class EditorController: NSObject {
       guard let self else { return }
 
       // Calculate changed range for manual edits
-      let previousText = self.versionStore.currentVersion?.text ?? ""
+      let previousText = self.versionController?.currentVersion?.text ?? ""
       let changedRange = TextDiffManager.findChangedRange(
         oldText: previousText,
         newText: text
@@ -165,7 +165,7 @@ final class EditorController: NSObject {
       // Don't apply highlight when creating the version, only when restoring from timeline
 
       self.wordsCount = wordsCount
-      self.versionStore.createVersion(
+      self.versionController?.addVersion(
         text: text,
         changeType: .manual,
         cursorPosition: cursorPosition,
@@ -200,7 +200,7 @@ final class EditorController: NSObject {
     // Create version for synonym replacement
     let cursorPosition = tv.selectedRange.location
     let newText = tv.text ?? ""
-    versionStore.createVersion(
+    versionController?.addVersion(
       text: newText,
       changeType: .synonym(word: originalWord, replacement: synonym),
       cursorPosition: cursorPosition,
@@ -214,10 +214,10 @@ final class EditorController: NSObject {
   }
 }
 
-extension EditorController {
+extension EditorController: UITextViewDelegate {
   func textView(
     _ textView: UITextView,
-    shouldChangeTextIn ranges: [NSValue],
+    shouldChangeTextIn range: NSRange,
     replacementText text: String
   ) -> Bool {
     if highlightManager.hasActiveHighlight() {

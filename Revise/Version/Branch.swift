@@ -1,22 +1,30 @@
 import Foundation
+import SwiftData
 
-// MARK: - Branch Model
-struct Branch: Identifiable, Equatable, Codable {
-  // Centralized default branch name
+@Model
+final class Branch {
   static let main = "main"
+  
+  @Attribute(.unique)
+  var id: String
 
-  // Branch identifier (e.g. "main", "idea-1")
-  let id: String
-  // Reference branch this branch diverged from ("main" for root)
-  let ref: String
-  // The version ID in the reference branch where this branch started
-  let baseVersionId: String?
-  let createdAt: Date
+  var name: String
+  var createdAt: Date
 
-  init(id: String, ref: String, baseVersionId: String?) {
-    self.id = id
-    self.ref = ref
-    self.baseVersionId = baseVersionId
-    self.createdAt = Date()
+  var document: Document
+
+  var parent: Branch?
+  var baseVersion: Version?
+
+  @Relationship(deleteRule: .cascade, inverse: \Version.branch)
+  var versions: [Version] = []
+
+  var currentVersion: Version?
+
+  init(name: String, document: Document) {
+    self.id = UUID().uuidString
+    self.name = name
+    self.document = document
+    self.createdAt = .now
   }
 }

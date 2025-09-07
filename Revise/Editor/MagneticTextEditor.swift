@@ -125,10 +125,11 @@ struct MagneticTextEditor: UIViewRepresentable {
     }
 
     func textView(
-      _ textView: UITextView, shouldChangeTextInRanges ranges: [NSValue],
+      _ textView: UITextView, 
+      shouldChangeTextIn range: NSRange,
       replacementText text: String
     ) -> Bool {
-      editorController.textView(textView, shouldChangeTextIn: ranges, replacementText: text)
+      editorController.textView(textView, shouldChangeTextIn: range, replacementText: text)
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {

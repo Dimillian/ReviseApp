@@ -1,38 +1,53 @@
+import SwiftData
 import SwiftUI
 import UIKit
 
 struct EditorView: View {
-  private let documentStore: DocumentStore
-  private let document: Document
+  let document: Document
+
+  @Environment(\.modelContext) private var modelContext
+  @Query private var versions: [Version]
+  @Query private var branches: [Branch]
 
   @State private var text = ""
   @State private var timelineState: TimelineViewState = .visible
-  // Editor zoom state (1.0 = normal). Pinch-out reduces this to reveal the graph behind.
   @State private var editorScale: CGFloat = 1.0
   @State private var baseScale: CGFloat = 1.0
   @State private var isGraphVisible: Bool = false
   @State private var didHapticReveal: Bool = false
 
-  @State private var editorController: EditorController
-  @State private var versionStore: VersionStore
+  @State private var editorController = EditorController()
+  @State private var versionController: VersionController?
   @State private var isFirstLaunch = true
 
   @State private var isMenuLoading = false
 
   private let textPadding: CGFloat = 24
 
-  init(document: Document, documentStore: DocumentStore) {
+  init(document: Document) {
     self.document = document
-    self.documentStore = documentStore
-    let versionStore = VersionStore(document: document, documentStore: documentStore)
-    let editorController = EditorController(versionStore: versionStore)
-    _versionStore = State(initialValue: versionStore)
-    _editorController = State(initialValue: editorController)
+
+    let documentId = document.id
+    let currentBranchId = document.currentBranch?.id ?? Branch.main
+
+    _versions = Query(
+      filter: #Predicate<Version> { version in
+        version.branch.document.id == documentId && version.branch.id == currentBranchId
+      },
+      sort: \Version.timestamp
+    )
+
+    _branches = Query(
+      filter: #Predicate<Branch> { branch in
+        branch.document.id == documentId
+      },
+      sort: \Branch.createdAt
+    )
+
   }
 
   var body: some View {
     ZStack(alignment: .leading) {
-      // Foreground: editor content scaled with pinch
       ZStack(alignment: .leading) {
         ScrollView(.vertical) {
           ZStack(alignment: .topLeading) {
@@ -46,29 +61,31 @@ struct EditorView: View {
         .scrollDismissesKeyboard(.interactively)
 
         VersionTimelineView(
-          versionStore: versionStore,
+          versions: versions,
+          currentIndex: versionController?.currentIndex ?? -1,
           onVersionSelected: { version in
-            editorController.restoreVersion(version)
+            if let restoredVersion = versionController?.navigateToVersion(version) {
+              editorController.restoreVersion(restoredVersion)
+            }
           },
           timelineState: $timelineState
         )
-        .opacity(editorScale)  // fade out timeline slightly as we zoom out
+        .opacity(editorScale)
       }
       .scaleEffect(editorScale)
       .animation(.smooth(duration: 0.2), value: editorScale)
       .opacity(isGraphVisible ? 0 : 1)
       .allowsHitTesting(!isGraphVisible)
 
-      // Overlay: Branch graph (only when visible) above editor to ensure interactions
-      if isGraphVisible {
+      if isGraphVisible, let controller = versionController {
         BranchGraphView(
-          versionStore: versionStore,
-          onSelectBranch: { name in
+          branches: branches,
+          currentBranchId: document.currentBranch?.id ?? Branch.main,
+          versionController: controller,
+          onSelectBranch: { branchId in
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            versionStore.switchBranch(to: name)
-            if let latest = versionStore.currentVersion
-              ?? versionStore.latestVersion(forBranch: name)
-            {
+            controller.switchToBranch(named: branchId)
+            if let latest = controller.currentVersion {
               editorController.restoreVersion(latest)
             }
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
@@ -120,7 +137,10 @@ struct EditorView: View {
       }
     }
     .onAppear {
-      if let latestVersion = versionStore.versions.last {
+      let controller = VersionController(document: document, modelContext: modelContext)
+      versionController = controller
+      editorController.versionController = controller
+      if let latestVersion = versions.last {
         editorController.restoreVersion(latestVersion)
         isFirstLaunch = false
       }
@@ -153,12 +173,12 @@ struct EditorView: View {
         .animation(.bouncy, value: editorController.wordsCount)
       Text(editorController.wordsCount == 1 ? " word" : " words")
       Text("  •  ")
-      Text("\(versionStore.versions.count)")
-        .contentTransition(.numericText(value: Double(versionStore.versions.count)))
-        .animation(.bouncy, value: versionStore.versions.count)
-      Text(versionStore.versions.count == 1 ? " version" : " versions")
+      Text("\(versions.count)")
+        .contentTransition(.numericText(value: Double(versions.count)))
+        .animation(.bouncy, value: versions.count)
+      Text(versions.count == 1 ? " version" : " versions")
       Text("  •  ")
-      Text("\(versionStore.currentBranch)")
+      Text("\(document.currentBranch?.name ?? Branch.main)")
     }
     .font(.inter(size: 12, relativeTo: .caption))
     .foregroundStyle(.textSecondary)
@@ -190,9 +210,9 @@ struct EditorView: View {
         }
       }
       Menu {
-        ForEach(versionStore.branches.map { $0.key }, id: \.self) { branch in
-          Button(branch, systemImage: "branch") {
-            editorController.switchBranch(to: branch)
+        ForEach(branches, id: \.id) { branch in
+          Button(branch.id, systemImage: "branch") {
+            editorController.switchBranch(to: branch.id)
           }
         }
       } label: {
@@ -220,21 +240,17 @@ extension EditorView {
   private var magnificationGesture: some Gesture {
     MagnificationGesture()
       .onChanged { scale in
-        // Inverse: pinch-in (scale < 1) reveals graph by shrinking editor
         let target = (baseScale * scale).clamped(to: 0.6...1.0)
         editorScale = target
-        // Reveal the graph once we pass a threshold
         let revealThreshold: CGFloat = 0.92
         let willReveal = target < revealThreshold
         withAnimation(.smooth(duration: 0.15)) { isGraphVisible = willReveal }
-        // Haptic on reveal threshold cross
         if willReveal && !didHapticReveal {
           UIImpactFeedbackGenerator(style: .soft).impactOccurred()
           didHapticReveal = true
         }
       }
       .onEnded { scale in
-        // Snap to either fully open or closed for a clean end state
         let openThreshold: CGFloat = 0.85
         if editorScale < openThreshold {
           withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
