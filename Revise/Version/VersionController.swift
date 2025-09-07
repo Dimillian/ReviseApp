@@ -77,8 +77,10 @@ final class VersionController {
           lastVersion.highlightedLocation = highlightedRange.location
           lastVersion.highlightedLength = highlightedRange.length
         }
+        
       }
     } else {
+      lastEditTime = Date()
       let branchVersions = versions
       if let currentVersion = branch.currentVersion,
         let currentIdx = branchVersions.firstIndex(where: { $0.id == currentVersion.id }),
@@ -113,7 +115,6 @@ final class VersionController {
     }
 
     document.lastEdited = Date()
-    lastEditTime = Date()
 
     try? modelContext.save()
   }

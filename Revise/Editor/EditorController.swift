@@ -89,6 +89,12 @@ final class EditorController: NSObject {
         changeType: version.changeType
       )
     }
+    
+    // Reset typing attributes to default to prevent gray text when typing
+    tv.typingAttributes = [
+      .font: tv.font ?? UIFont.systemFont(ofSize: 17),
+      .foregroundColor: UIColor(Color.textPrimary)
+    ]
 
     isRestoringVersion = false
   }
