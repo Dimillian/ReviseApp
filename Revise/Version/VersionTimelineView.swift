@@ -32,7 +32,6 @@ struct VersionTimelineView: View {
   @State private var isDragging = false
 
   var body: some View {
-    let _ = Self._printChanges()
     GeometryReader { geometry in
       ZStack(alignment: .trailing) {
         makeNodesView(for: geometry)

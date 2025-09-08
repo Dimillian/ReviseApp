@@ -63,18 +63,13 @@ final class SynonymManager: NSObject {
         }
       }
 
-      let more = UIAction(title: "More…") { _ in
-        // TODO: Present a sheet with full list
-      }
-
       let replaceMenu = UIMenu(
         title: "Replace \"\(word)\"",
         options: .displayInline,
-        children: actions + [more]
+        children: actions
       )
       return UIMenu(children: [replaceMenu] + suggestedActions)
     } else {
-      // No synonyms available
       return UIMenu(children: suggestedActions)
     }
   }

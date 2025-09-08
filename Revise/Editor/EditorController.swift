@@ -22,6 +22,7 @@ final class EditorController: NSObject {
   private var isRestoringVersion = false
   private var isApplyingSynonym = false
   private var versionDebounceTask: Task<Void, Never>?
+  private var synonymLoadingTask: Task<Void, Never>?
 
   init(versionController: VersionController? = nil) {
     self.versionController = versionController
@@ -186,22 +187,15 @@ final class EditorController: NSObject {
   ) {
     guard let tv = textView else { return }
 
-    // Cancel any pending version task
     versionDebounceTask?.cancel()
 
-    // Set flag to prevent duplicate version
     isApplyingSynonym = true
 
-    // Calculate the new range for the replaced text
     let replacementLocation = tv.offset(from: tv.beginningOfDocument, to: range.start)
     let replacementRange = NSRange(location: replacementLocation, length: synonym.count)
 
-    // Replace the text
     tv.replace(range, withText: synonym)
 
-    // Don't apply highlight when creating the version, only when restoring from timeline
-
-    // Create version for synonym replacement
     let cursorPosition = tv.selectedRange.location
     let newText = tv.text ?? ""
     versionController?.addVersion(
@@ -211,7 +205,6 @@ final class EditorController: NSObject {
       highlightedRange: replacementRange
     )
 
-    // Reset flag after a small delay
     DispatchQueue.main.async { [weak self] in
       self?.isApplyingSynonym = false
     }
@@ -252,25 +245,30 @@ extension EditorController: UITextViewDelegate {
   }
 
   func textViewDidChangeSelection(_ textView: UITextView) {
+    synonymLoadingTask?.cancel()
+    synonymLoadingTask = nil
+
     guard let range = textView.selectedTextRange,
-      let word = textView.text(in: range),
-      !word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      let selectedText = textView.text(in: range)?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !selectedText.isEmpty,
+      !selectedText.contains(" "),  // Single word check
+      !selectedText.contains("\n")  // No newlines
     else {
       synonymManager.clearSelection()
       suppressSystemMenu = false
       if let magneticTV = textView as? MagneticTextView {
         magneticTV.shouldSuppressMenu = false
       }
+      editMenuInteraction?.dismissMenu()
       return
     }
 
-    synonymManager.setCurrentWord(word)
+    synonymManager.setCurrentWord(selectedText)
     suppressSystemMenu = true
     if let magneticTV = textView as? MagneticTextView {
       magneticTV.shouldSuppressMenu = true
     }
 
-    // Get context and load synonyms
     let sentenceRange =
       textView.tokenizer.rangeEnclosingPosition(
         range.start,
@@ -279,12 +277,12 @@ extension EditorController: UITextViewDelegate {
       ) ?? range
     let context = textView.text(in: sentenceRange) ?? ""
 
-    // Show menu immediately (will show loading state)
-    showEditMenu(for: range)
+    synonymLoadingTask = Task { [weak self] in
+      guard !Task.isCancelled else { return }
 
-    // Load synonyms asynchronously
-    Task {
-      await synonymManager.loadSynonyms(for: word, context: context)
+      self?.showEditMenu(for: range)
+
+      await self?.synonymManager.loadSynonyms(for: selectedText, context: context)
     }
   }
 }
@@ -331,6 +329,9 @@ extension EditorController: UIEditMenuInteractionDelegate {
 // MARK: - SynonymManagerDelegate
 extension EditorController: SynonymManagerDelegate {
   func synonymManagerDidStartLoading(for word: String) {
+    // Don't show menu if task was cancelled
+    guard synonymLoadingTask != nil && !synonymLoadingTask!.isCancelled else { return }
+
     // Refresh menu to show loading state
     guard let tv = textView,
       let range = tv.selectedTextRange
@@ -340,6 +341,9 @@ extension EditorController: SynonymManagerDelegate {
   }
 
   func synonymManagerDidLoadSynonyms(_ synonyms: [String], for word: String) {
+    // Don't show menu if task was cancelled
+    guard synonymLoadingTask != nil && !synonymLoadingTask!.isCancelled else { return }
+
     // Refresh menu with loaded synonyms
     guard let tv = textView,
       let range = tv.selectedTextRange
