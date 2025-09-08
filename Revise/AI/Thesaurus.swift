@@ -71,9 +71,11 @@ struct Thesaurus {
     return response.content
   }
 
-  func branchTitle() async throws -> String {
+  func branchTitle(existingBranches: [String]) async throws -> String {
     let prompt: String = """
       Return a simple two words title for a new branch of a document. 
+      Make sure the title is not already used by an existing branch.
+      Existing branches: \(existingBranches.joined(separator: ", "))
       Like "Elipson Orange". 
       Two random words.
       Don't wrap it in any JSON, simply return the title as a string, without any quotation marks.

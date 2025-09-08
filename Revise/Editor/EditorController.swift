@@ -109,7 +109,8 @@ final class EditorController: NSObject {
   }
 
   func createNewBranch() async {
-    let title = try? await thesaurus.branchTitle()
+    let title = try? await thesaurus.branchTitle(
+      existingBranches: versionController?.document.branches.map { $0.name } ?? [])
     if let title {
       versionController?.createBranch(named: title)
       versionController?.switchToBranch(named: title)

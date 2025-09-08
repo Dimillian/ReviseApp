@@ -13,46 +13,19 @@ Revise is a premium iOS writing app focused on short-form text perfection throug
 - Views can directly own their state when not shared
 
 ### Data Persistence with SwiftData
-- Uses SwiftData (iOS 17+) for all data persistence
+- Uses SwiftData for all data persistence
 - No manual JSON encoding/decoding or file management
 - Core Data models: Document, Branch, Version
 - Relationships are managed automatically by SwiftData
 
-### Core Components
 
-1. **MagneticTextView**: UITextView wrapper for SwiftUI
-   - Magnetic text selection with word/sentence/line snapping
-   - Haptic feedback for premium feel
-   - Smart content detection (poetry vs prose)
-   - Gesture-based selection
-
-2. **Version Timeline**: 
-   - Vertical axis for chronological edits
-   - Auto-save on every edit with coalescing (2 second window)
-   - Visual timeline with centered dots in glass-effect capsule
-   - Drag gesture for scrubbing through versions
-   - Shows word count and timestamp on hover (expanded mode)
-
-3. **Branch System**:
-   - Horizontal axis for alternative versions
-   - Created via: explicit branch, AI variations, or major rewrites
-   - Pinch gesture reveals branch graph visualization
-   - Visual tree with node tiles showing preview text
-   - Branch graph shows parent-child relationships with curved edges
-
-4. **Data Models (SwiftData)**:
-   - **Document**: Has unique id, title, lastEdited, currentBranch, and branches[]
-   - **Branch**: Has unique id, belongs to Document (non-optional), has parent Branch (optional), versions[], and currentVersion
-   - **Version**: Has unique id, belongs to Branch (non-optional), stores text, changeKind, word/character counts, cursor position, and selection ranges
+### Data Models (SwiftData):
+- **Document**: Has unique id, title, lastEdited, currentBranch, and branches[]
+- **Branch**: Has unique id, belongs to Document (non-optional), has parent Branch (optional), versions[], and currentVersion
+- **Version**: Has unique id, belongs to Branch (non-optional), stores text, changeKind, word/character counts, cursor position, and selection ranges
 
 
 ## Key Implementation Details
-
-### Text Editor Requirements
-- Must wrap UITextView for advanced text manipulation
-- Implement magnetic selection at word/sentence/line boundaries
-- Provide haptic feedback on selection changes
-- Auto-detect content type (poetry/prose/code)
 
 ### Version Control
 - Every edit triggers auto-save via VersionController
@@ -73,14 +46,6 @@ Revise is a premium iOS writing app focused on short-form text perfection throug
 - Each AI suggestion creates new branch
 - Maintain context of current writing style
 - Cache responses for performance
-
-## Testing Requirements
-
-- Test magnetic selection across different text types
-- Verify version persistence and restoration
-- Test gesture recognition and conflicts
-- Validate AI response handling
-- Performance testing with large documents
 
 ## Important Architectural Details
 
