@@ -1,18 +1,15 @@
 {
   "fill" : {
-    "solid" : "extended-gray:1.00000,1.00000"
+    "linear-gradient" : [
+      "display-p3:0.10196,0.10196,0.10196,1.00000",
+      "display-p3:0.41961,0.41961,0.41961,1.00000"
+    ]
   },
   "groups" : [
     {
-      "blend-mode-specializations" : [
-        {
-          "appearance" : "dark",
-          "value" : "normal"
-        }
-      ],
       "blur-material-specializations" : [
         {
-          "value" : 0.1
+          "value" : 1
         },
         {
           "appearance" : "dark",
@@ -21,32 +18,14 @@
       ],
       "layers" : [
         {
-          "fill-specializations" : [
-            {
-              "value" : {
-                "linear-gradient" : [
-                  "extended-srgb:1.00000,0.80000,0.00000,1.00000",
-                  "extended-srgb:1.00000,0.21961,0.23529,1.00000"
-                ]
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "linear-gradient" : [
-                  "extended-srgb:1.00000,0.80000,0.00000,1.00000",
-                  "extended-srgb:1.00000,0.21961,0.23529,1.00000"
-                ]
-              }
-            }
-          ],
-          "image-name" : "Sparkle.png",
-          "name" : "Sparkle",
+          "fill" : "none",
+          "image-name" : "branch.png",
+          "name" : "branch",
           "position" : {
-            "scale" : 0.1,
+            "scale" : 1.3,
             "translation-in-points" : [
-              -200,
-              -200
+              0,
+              0
             ]
           }
         }
@@ -60,7 +39,7 @@
       "shadow-specializations" : [
         {
           "value" : {
-            "kind" : "neutral",
+            "kind" : "layer-color",
             "opacity" : 1
           }
         },
@@ -68,67 +47,25 @@
           "appearance" : "dark",
           "value" : {
             "kind" : "layer-color",
-            "opacity" : 0.5
+            "opacity" : 1
           }
         }
       ],
       "translucency-specializations" : [
         {
           "value" : {
-            "enabled" : false,
-            "value" : 1
+            "enabled" : true,
+            "value" : 0.5
           }
         },
         {
           "appearance" : "dark",
           "value" : {
-            "enabled" : false,
+            "enabled" : true,
             "value" : 0.5
           }
         }
       ]
-    },
-    {
-      "layers" : [
-        {
-          "fill-specializations" : [
-            {
-              "value" : {
-                "linear-gradient" : [
-                  "extended-srgb:1.00000,0.21961,0.23529,1.00000",
-                  "extended-srgb:1.00000,0.80000,0.00000,1.00000"
-                ]
-              }
-            },
-            {
-              "appearance" : "dark",
-              "value" : {
-                "linear-gradient" : [
-                  "extended-srgb:1.00000,0.21961,0.23529,1.00000",
-                  "extended-srgb:1.00000,0.80000,0.00000,1.00000"
-                ]
-              }
-            }
-          ],
-          "image-name" : "Write.png",
-          "name" : "Write",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
-              0,
-              70
-            ]
-          }
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
-      }
     }
   ],
   "supported-platforms" : {
