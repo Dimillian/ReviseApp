@@ -61,6 +61,7 @@ struct MagneticTextEditor: UIViewRepresentable {
     tv.showsVerticalScrollIndicator = false
     tv.delegate = context.coordinator
     tv.writingToolsBehavior = .complete
+    tv.allowsEditingTextAttributes = true
     tv.becomeFirstResponder()
 
     // Set content compression resistance for proper sizing

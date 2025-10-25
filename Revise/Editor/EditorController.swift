@@ -59,17 +59,22 @@ final class EditorController: NSObject {
     guard let tv = textView else { return }
     isRestoringVersion = true
 
-    let attributedText = NSMutableAttributedString(string: version.text)
-    let fullRange = NSRange(location: 0, length: attributedText.length)
+    let storedAttributedText = versionController?.document.attributedText(for: version.id)
+    let attributedText = NSMutableAttributedString(
+      attributedString: storedAttributedText ?? NSAttributedString(string: version.text)
+    )
     highlightManager.setDefaultAttributes(
       font: tv.font ?? UIFont.systemFont(ofSize: 17),
       textColor: UIColor(Color.textPrimary)
     )
-    attributedText.addAttributes(
-      [
-        .font: tv.font ?? UIFont.systemFont(ofSize: 17),
-        .foregroundColor: UIColor(Color.textPrimary),
-      ], range: fullRange)
+    if storedAttributedText == nil {
+      let fullRange = NSRange(location: 0, length: attributedText.length)
+      attributedText.addAttributes(
+        [
+          .font: tv.font ?? UIFont.systemFont(ofSize: 17),
+          .foregroundColor: UIColor(Color.textPrimary),
+        ], range: fullRange)
+    }
     tv.attributedText = attributedText
     wordsCount = version.wordCount
 
@@ -153,7 +158,11 @@ final class EditorController: NSObject {
     editMenuInteraction?.presentEditMenu(with: config)
   }
 
-  private func createVersion(text: String, cursorPosition: Int) async {
+  private func createVersion(
+    text: String,
+    attributedText: NSAttributedString,
+    cursorPosition: Int
+  ) async {
     let wordsCount = TextDiffManager.calculateWordCount(for: text)
     let title = try? await thesaurus.title(for: text)
 
@@ -172,6 +181,7 @@ final class EditorController: NSObject {
       self.wordsCount = wordsCount
       self.versionController?.addVersion(
         text: text,
+        attributedText: attributedText,
         changeType: .manual,
         cursorPosition: cursorPosition,
         highlightedRange: changedRange,
@@ -198,8 +208,12 @@ final class EditorController: NSObject {
 
     let cursorPosition = tv.selectedRange.location
     let newText = tv.text ?? ""
+    let attributedText = NSAttributedString(
+      attributedString: tv.attributedText ?? NSAttributedString(string: newText)
+    )
     versionController?.addVersion(
       text: newText,
+      attributedText: attributedText,
       changeType: .synonym(word: originalWord, replacement: synonym),
       cursorPosition: cursorPosition,
       highlightedRange: replacementRange
@@ -232,6 +246,9 @@ extension EditorController: UITextViewDelegate {
 
     let text = textView.text ?? ""
     let cursorPosition = textView.selectedRange.location
+    let attributedText = NSAttributedString(
+      attributedString: textView.attributedText ?? NSAttributedString(string: text)
+    )
 
     versionDebounceTask = Task { [weak self] in
       // Wait for 0.5 seconds
@@ -240,7 +257,11 @@ extension EditorController: UITextViewDelegate {
       // Check if task was cancelled
       guard !Task.isCancelled else { return }
 
-      await self?.createVersion(text: text, cursorPosition: cursorPosition)
+      await self?.createVersion(
+        text: text,
+        attributedText: attributedText,
+        cursorPosition: cursorPosition
+      )
     }
   }
 

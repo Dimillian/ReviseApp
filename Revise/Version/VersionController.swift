@@ -44,6 +44,7 @@ final class VersionController {
 
   func addVersion(
     text: String,
+    attributedText: NSAttributedString,
     changeType: Version.ChangeType,
     cursorPosition: Int? = nil,
     selectedRange: NSRange? = nil,
@@ -69,6 +70,8 @@ final class VersionController {
         lastVersion.characterCount = characterCount
         lastVersion.cursorPosition = cursorPosition
 
+        document.setAttributedText(attributedText, for: lastVersion.id)
+
         if let selectedRange = selectedRange {
           lastVersion.selectedLocation = selectedRange.location
           lastVersion.selectedLength = selectedRange.length
@@ -91,6 +94,7 @@ final class VersionController {
         for version in toRemove {
           if let idx = branch.versions.firstIndex(where: { $0.id == version.id }) {
             branch.versions.remove(at: idx)
+            document.removeAttributedText(for: version.id)
             modelContext?.delete(version)
           }
         }
@@ -107,9 +111,12 @@ final class VersionController {
       branch.versions.append(newVersion)
       branch.currentVersion = newVersion
 
+      document.setAttributedText(attributedText, for: newVersion.id)
+
       if branch.versions.count > maxVersions {
         if let firstVersion = branch.versions.first {
           branch.versions.removeFirst()
+          document.removeAttributedText(for: firstVersion.id)
           modelContext?.delete(firstVersion)
         }
       }
@@ -183,6 +190,10 @@ final class VersionController {
       )
       newBranch.versions.append(seedVersion)
       newBranch.currentVersion = seedVersion
+
+      if let storedAttributed = document.attributedText(for: currentVersion.id) {
+        document.setAttributedText(storedAttributed, for: seedVersion.id)
+      }
     }
 
     document.branches.append(newBranch)
