@@ -1,155 +1,93 @@
 # Claude Development Guide for Revise
 
-## Project Overview
+## Project Snapshot
 
-Revise is a premium iOS writing app focused on short-form text perfection through non-destructive editing and AI-powered variations. This is a SwiftUI-first application targeting iOS 26+ with the latest APIs.
+Revise is an iOS 26+ writing companion built with SwiftUI, SwiftData, and Apple’s on-device Foundation Models. The app treats every edit as a version, lets writers branch into alternate drafts, and surfaces AI-assisted wording suggestions when contextually relevant. The shipping experience consists of a drafts list that seeds new documents with AI-generated titles, a detail editor with an always-available version timeline, and a zoomable branch graph for exploring divergent ideas.
 
-## Architecture Principles
+## App Entry & Navigation Flow
 
-### No MVVM Pattern
-- Use @Observable objects directly
-- Inject shared state via SwiftUI environment
-- Keep business logic in Observable classes
-- Views can directly own their state when not shared
+- `ReviseApp` hosts a single `WindowGroup` backed by a SwiftData `ModelContainer` for `Document`, `Branch`, and `Version` models. The container is attached at the scene level so every screen can access the same `ModelContext`.
+- Before presenting the main UI, the app checks `SystemLanguageModel.default.isAvailable`. If the on-device large language model is unavailable the app renders `UnavailableView`; otherwise it shows a `NavigationStack` with the documents list.
+- `DocumentsListView` queries documents with `@Query(sort: \Document.lastEdited, order: .reverse)` and pushes `EditorView` for document navigation using value-based `NavigationLink`s.
 
-### Data Persistence with SwiftData
-- Uses SwiftData for all data persistence
-- No manual JSON encoding/decoding or file management
-- Core Data models: Document, Branch, Version
-- Relationships are managed automatically by SwiftData
+## Data Layer
 
+SwiftData models live in `Revise/Models` and define all persisted state:
 
-### Data Models (SwiftData):
-- **Document**: Has unique id, title, lastEdited, currentBranch, and branches[]
-- **Branch**: Has unique id, belongs to Document (non-optional), has parent Branch (optional), versions[], and currentVersion
-- **Version**: Has unique id, belongs to Branch (non-optional), stores text, changeKind, word/character counts, cursor position, and selection ranges
+- **Document** – uniquely identified (`@Attribute(.unique)`), stores title, last edit date, and the currently selected branch. Owns branches with cascade deletion.
+- **Branch** – uniquely identified, linked to its `Document`, tracks creation timestamp, optional parent branch, optional `baseVersion`, ordered versions, and the branch’s active version. The static `Branch.main` constant labels the initial branch.
+- **Version** – uniquely identified snapshot of text. Records timestamp, body text, change kind (`manual`, `synonym`, `ai`, `undo`, `redo`), counts, caret position, selected/highlighted ranges, and optional synonym or AI metadata. Convenience initialisers compute counts and range metadata.
 
+Relationships are declared with SwiftData annotations so inverse lookups and cascade deletes happen automatically. All persistence goes through the injected `ModelContext`; there is no manual file or JSON storage.
 
-## Key Implementation Details
+## Controllers & Business Logic
 
-### Version Control
-- Every edit triggers auto-save via VersionController
-- Coalescing: rapid edits within 2 seconds update the same version
-- Maximum 100 versions per branch (oldest removed when exceeded)
-- VersionController manages all version operations (add, undo, redo, navigate)
-- Branch creation copies current version as seed for new branch
+- **VersionController** (`Revise/Version/VersionController.swift`)
+  - Owns a `Document` reference plus an optional `ModelContext` (set from the view) to save mutations.
+  - Maintains coalesced manual edits by reusing the latest version when changes arrive within a 2s window.
+  - Limits per-branch history to 100 versions, pruning the oldest entries beyond the cap.
+  - Supports undo/redo, arbitrary navigation, branch creation (cloning the current version into the new branch), branch switching, renaming, and deletion (except the `main` branch).
+  - Generates data for branch graph visualisation: preview strings, diff highlights, and adjacency edges.
 
-### Gesture Navigation
-- Vertical swipe: timeline navigation
-- Horizontal swipe: branch switching
-- Pinch: zoom time density or enter tree view
-- Force press: peek at version
-- Three-finger tap: quick tree overlay
+- **EditorController** (`Revise/Editor/EditorController.swift`)
+  - Bridges the SwiftUI view to the underlying `UITextView` (`MagneticTextView`). Tracks the live `UITextView`, handles word selection, restores versions, and coordinates with `VersionController`.
+  - Debounces edits (500ms) before adding a version, computes changed ranges for highlight previews, and requests title updates from the AI `Thesaurus`.
+  - Manages the custom synonym workflow: when a single word is selected it suppresses the default menu, queries synonyms, and builds a custom `UIEditMenu` populated with AI responses. Applying a synonym records a `.synonym` version and highlights the replaced text.
+  - Exposes undo/redo/branch creation helpers used by the toolbar menu.
 
-### AI Integration
-- Three modes: Rephrase, Tone Shift, Constrain
-- Each AI suggestion creates new branch
-- Maintain context of current writing style
-- Cache responses for performance
+- **Managers** (`Revise/Editor/Managers`)
+  - `TextDiffManager` computes changed ranges and word counts for versioning and preview diffing.
+  - `HighlightManager` centralises highlight styling when restoring historical versions.
+  - `SynonymManager` wraps async loading state and menu construction for the synonym experience.
 
-## Important Architectural Details
+## Editor Experience
 
-### SwiftData Implementation
-- **ModelContainer**: Configured in ReviseApp with all three models
-- **@Query**: Used in views for reactive data fetching with predicates
-- **ModelContext**: Accessed via @Environment for data mutations
-- **Relationships**: Properly configured with inverse relationships and cascade delete rules
-- **Non-optional relationships**: Branch must have Document, Version must have Branch
+`EditorView` orchestrates the editing surface:
 
-### Key Controllers
-- **VersionController**: Manages all version operations, replaces old VersionStore
-  - Handles version coalescing, undo/redo, branch operations
-  - Integrates with ModelContext for persistence
-- **EditorController**: Manages text editor state and interactions
-  - Handles synonym selection, text restoration, haptic feedback
-  - Communicates with VersionController for version management
+- Uses `MagneticTextEditor`, a `UIViewRepresentable` wrapper, to provide single-tap word selection, intrinsic content sizing, and typewriter styling.
+- Tracks timeline visibility via `TimelineViewState` (`hidden`, `visible`, `expanded`). Users can toggle states by tapping the title/subtitle or by horizontal drags on the editor surface. The timeline itself is always vertical and supports scrub gestures plus tap-to-jump.
+- Captures pinch gestures: shrinking the editor below 0.85 scale reveals the `BranchGraphView`. Releasing the gesture either snaps back to the editor or settles into a 0.75 zoomed-out graph state with haptic feedback.
+- When the branch graph is visible, it renders branch nodes positioned by hierarchy, draws curved edges, and allows tapping nodes to switch branches. Nodes display AI/synonym badges and diff-aware previews computed by `VersionController`.
+- The toolbar menu provides branch creation (AI-titled), branch switching, undo/redo, and sharing.
 
-### UI State Management
-- Timeline state (hidden/visible/expanded) managed locally in EditorView
-- Branch graph visibility controlled by pinch gesture
-- Editor scale for zoom effect during branch visualization
-- All UI state uses @State, business logic in @Observable controllers
+## AI & Language Model Integration
 
-## Important Notes
+- The `Thesaurus` type (in `Revise/AI/Thesaurus.swift`) wraps `LanguageModelSession` from the Foundation Models framework.
+- It pre-warms a session on init and exposes helpers to:
+  - Propose synonyms for a selected word given sentence context (used by `SynonymManager`).
+  - Suggest document titles for new drafts and new branches.
+  - Generate inline document titles when content changes to keep the navigation title fresh.
+- Because these calls rely on `SystemLanguageModel`, the app gates the editor UI when the model is unavailable.
 
-1. **iOS 26+ Only**: Uses latest TextKit 2, SwiftUI, and SwiftData features
-2. **No Legacy Storage**: All data persistence through SwiftData, no JSON files
-3. **Memory**: SwiftData handles caching, max 100 versions per branch
-4. **Accessibility**: Full VoiceOver support required
-5. **Typography**: Literata for content, Inter for UI, with dynamic sizing
+## UI & Design System
 
+- Semantic colours live in `Revise/DesignSystem/Color.swift` as dynamic Light/Dark-aware values with convenience aliases for SwiftUI `ShapeStyle` usage.
+- Typography is defined in `Revise/DesignSystem/Font.swift` via `Font.literata` and `Font.inter` helpers. UIKit components manually request the same font names to keep parity with SwiftUI.
+- Default editor appearance: Literata at large sizes for body text, Inter for chrome and metadata, warm gold caret (`Color.successGold`) for the typewriter feel.
 
-## Typography & Fonts
+## Document List Experience
 
-### Custom Fonts
-- **Literata**: Serif font for body text and poetry
-- **Inter**: Sans-serif font for UI elements
+- `DocumentsListView` shows each document’s title plus relative `lastEdited` time, word/version/branch counts, and routes selection into the editor.
+- Creating a new document spins up a task that requests an AI-generated two-word title, inserts a main branch with an empty seed version, and pushes straight into the editor.
+- Deleting uses SwiftData cascade rules to clear branches and versions automatically.
 
-### Font Usage
-```swift
-// Basic usage
-Text("Hello World").font(.literata())
+## Build, Test, and Development Workflow
 
-// With text styles
-Text("Title").font(.literata(.title))
-Text("Body").font(.inter(.body))
+- Use the MCP Xcode build tools for validation:
+  - `mcp__XcodeBuildMCP__discover_projs` to inspect schemes.
+  - `mcp__XcodeBuildMCP__build_sim` to compile against the iOS Simulator SDK.
+  - `mcp__XcodeBuildMCP__clean` when a clean build is required.
+- Run logic tests with the default `ReviseTests` target and UI flows in `ReviseUITests` (both XCTest-based). Keep tests deterministic and focused on versioning, diffing, and gesture behaviours.
+- Maintain SwiftUI’s @Observable-driven architecture (no MVVM layers). Shared state lives in observables injected via environment, while view-local state remains in `@State`.
+- Enforce Swift style conventions: two-space indentation, PascalCase types, lowerCamelCase members, and files named after the primary type.
 
-// View modifier shorthand
-Text("Poetry").literataFont(.body)
-Text("UI Label").interFont(.caption)
-```
+## Accessibility & Product Expectations
 
-**Important**: Call `CustomFonts.registerFonts()` in app initialization.
+- VoiceOver should narrate timeline entries, branch tiles, and synonym menus with meaningful labels.
+- Keep animations purposeful and lightweight: timeline transitions use `.bouncy`, graph reveal uses spring animations, and haptic feedback punctuates important state changes.
+- Preserve non-destructive editing guarantees: every text mutation should either coalesce or produce a new `Version` so history always matches what the user typed or accepted from AI.
 
-## Design Guidelines
+## Security & Asset Handling
 
-- **Colors**: Minimal palette, focus on typography
-- **Animations**: Subtle, purposeful, spring-based
-- **Feedback**: Immediate haptic response
-- **Layout**: Generous padding, readable line lengths
-
-
-# Repository Guidelines
-
-## Project Structure & Module Organization
-- Source in `Revise/` (entry: `ReviseApp.swift`, main views like `ContentView.swift`).
-- Design system in `Revise/DesignSystem/` (`Color.swift`, `Font.swift`).
-- Assets in `Revise/Assets.xcassets/`; fonts in `Revise/Fonts/`.
-- Tests in `ReviseTests/` and UI tests in `ReviseUITests/`.
-- Xcode project: `Revise.xcodeproj` (scheme: `Revise`). See `CLAUDE.md` for architecture details.
-
-## Build, Test, and Development Commands
-- **Use XcodeBuildMCP for building**: Always use the MCP tools for building and validation
-- **Build validation**: Use `mcp__XcodeBuildMCP__build_sim` to verify code compiles without errors
-- **Never launch the app**: Only build to validate - let the user launch and test the app
-- Clean build artifacts: Use `mcp__XcodeBuildMCP__clean` when needed
-- Discover project structure: Use `mcp__XcodeBuildMCP__discover_projs`
-
-## Coding Style & Naming Conventions
-- Swift with 2-space indentation; keep lines focused; no trailing whitespace.
-- Types in PascalCase; functions/variables in lowerCamelCase; files match primary type name.
-- Prefer SwiftUI with `@Observable` and environment injection; no MVVM. Keep business logic in observable classes.
-- Use design tokens: `Color.*` for semantic colors and `Font.literata`/`Font.inter` for typography.
-
-## Testing Guidelines
-- Framework: XCTest. Name files `*Tests.swift`; test methods `test_*`.
-- Prioritize: magnetic selection accuracy, version persistence/restore, gesture conflict handling, AI suggestion lifecycle.
-- Run on iOS 26 simulators; keep tests deterministic and fast. Add UI screenshots only when assertions are insufficient.
-
-## Commit & Pull Request Guidelines
-- Commits: imperative mood, concise summary; reference issues (e.g., `Fix: selection snaps to word (#123)`).
-- PRs: clear what/why, screenshots or GIFs for UI changes, test plan, and linked issues. Keep PRs focused and small when possible.
-- Ensure builds and tests pass before requesting review.
-
-## Architecture Notes
-- **Target iOS 26+**: SwiftUI + TextKit 2 + SwiftData
-- **Core components**: MagneticTextView, Version Timeline, Branch System
-- **Data flow**: SwiftData models → @Query in views → VersionController for mutations → auto-save
-- **No manual file I/O**: All persistence via SwiftData ModelContainer
-- **Branch creation**: Explicit user action, AI variations, or major rewrites
-- Read `README.md` and `CLAUDE.md` before touching editor, versioning, or gesture code
-
-## Security & Configuration Tips
-- Do not commit secrets or tokens. Keep third-party assets/fonts licensed and in `Revise/Fonts/`.
-- Maintain accessibility (VoiceOver) and performance budgets when modifying UI/gestures.
-
+- Do not commit secrets or unlicensed assets. Custom fonts are shipped inside `Revise/Fonts/` and referenced by name.
+- All AI prompts stay on-device through Foundation Models—no network calls or external dependencies.
